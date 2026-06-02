@@ -128,15 +128,15 @@ export function getEfficiencyChartData(records: FuelRecord[]) {
 }
 
 export function getMonthlySpendingChartData(records: FuelRecord[]) {
-  const monthlyMap: Record<string, number> = {};
+  const monthlyMap = new Map<string, number>();
 
-  records.forEach((record) => {
+  sortRecordsAsc(records).forEach((record) => {
     const d = new Date(`${record.date}T00:00:00`);
     const key = `${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}`;
-    monthlyMap[key] = (monthlyMap[key] || 0) + record.totalPaid;
+    monthlyMap.set(key, (monthlyMap.get(key) || 0) + record.totalPaid);
   });
 
-  const entries = Object.entries(monthlyMap).slice(-6);
+  const entries = Array.from(monthlyMap.entries()).slice(-6);
 
   return {
     labels: entries.map(([label]) => label),
@@ -149,11 +149,11 @@ export function getMonthlySpendingChartData(records: FuelRecord[]) {
 }
 
 export function getToday() {
-  return new Date().toISOString().split("T")[0];
+  return toLocalISODate(new Date());
 }
 
 export function toISODate(date: Date) {
-  return date.toISOString().split("T")[0];
+  return toLocalISODate(date);
 }
 
 export function formatDisplayDate(dateString: string) {
@@ -167,4 +167,12 @@ export function formatDisplayDate(dateString: string) {
 export function shortDate(dateString: string) {
   const d = new Date(`${dateString}T00:00:00`);
   return `${d.getDate()}/${d.getMonth() + 1}`;
+}
+
+function toLocalISODate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }

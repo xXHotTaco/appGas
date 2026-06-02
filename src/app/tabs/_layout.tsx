@@ -1,5 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { ChartColumn, CirclePlus, ReceiptText } from "lucide-react-native";
 
 export default function TabsLayout() {
   return (
@@ -26,7 +26,7 @@ export default function TabsLayout() {
         options={{
           title: "Dashboard",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="analytics-outline" color={color} size={size} />
+            <ChartColumn color={color} size={size} />
           ),
         }}
       />
@@ -36,7 +36,7 @@ export default function TabsLayout() {
         options={{
           title: "Registro",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" color={color} size={size} />
+            <CirclePlus color={color} size={size} />
           ),
         }}
       />
@@ -46,7 +46,7 @@ export default function TabsLayout() {
         options={{
           title: "Historial",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="receipt-outline" color={color} size={size} />
+            <ReceiptText color={color} size={size} />
           ),
         }}
       />
