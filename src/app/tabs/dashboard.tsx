@@ -1,6 +1,14 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
-import { CircleGauge } from "lucide-react-native";
+import {
+  BadgeDollarSign,
+  CalendarDays,
+  CalendarRange,
+  ChartColumn,
+  CircleGauge,
+  Droplets,
+  Info,
+  TrendingUp,
+} from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
     Dimensions,
@@ -25,7 +33,24 @@ import { FuelRecord } from "../../types/fuel";
 
 const screenWidth = Dimensions.get("window").width;
 const chartWidth = Math.max(screenWidth - 42, 320);
-type IoniconName = keyof typeof Ionicons.glyphMap;
+type DashboardIconName =
+  | "money"
+  | "trend"
+  | "water"
+  | "calendar"
+  | "chart"
+  | "calendar-range"
+  | "info";
+
+const dashboardIcons = {
+  money: BadgeDollarSign,
+  trend: TrendingUp,
+  water: Droplets,
+  calendar: CalendarDays,
+  chart: ChartColumn,
+  "calendar-range": CalendarRange,
+  info: Info,
+} satisfies Record<DashboardIconName, React.ElementType>;
 
 export default function DashboardScreen() {
   const [records, setRecords] = useState<FuelRecord[]>([]);
@@ -78,22 +103,22 @@ export default function DashboardScreen() {
 
         <View style={styles.statsGrid}>
           <StatCard
-            icon="cash-outline"
+            icon="money"
             label="Gasto del mes"
             value={`$${stats.monthlySpent.toFixed(2)}`}
           />
           <StatCard
-            icon="analytics-outline"
+            icon="trend"
             label="Rendimiento"
             value={`${stats.averageKmPerLiter.toFixed(2)} km/L`}
           />
           <StatCard
-            icon="water-outline"
+            icon="water"
             label="Litros totales"
             value={`${stats.totalLiters.toFixed(1)} L`}
           />
           <StatCard
-            icon="calendar-number-outline"
+            icon="calendar"
             label="Próxima carga"
             value={
               stats.nextFillDate
@@ -103,7 +128,7 @@ export default function DashboardScreen() {
           />
         </View>
 
-        <ChartCard title="Gasto por carga" icon="bar-chart-outline">
+        <ChartCard title="Gasto por carga" icon="chart">
           {hasRecords ? (
             <BarChart
               data={spendingChartData}
@@ -122,7 +147,7 @@ export default function DashboardScreen() {
           )}
         </ChartCard>
 
-        <ChartCard title="Rendimiento km/L" icon="trending-up-outline">
+        <ChartCard title="Rendimiento km/L" icon="trend">
           {hasEfficiency ? (
             <LineChart
               data={efficiencyChartData}
@@ -139,7 +164,7 @@ export default function DashboardScreen() {
           )}
         </ChartCard>
 
-        <ChartCard title="Litros por carga" icon="water-outline">
+        <ChartCard title="Litros por carga" icon="water">
           {hasRecords ? (
             <BarChart
               data={litersChartData}
@@ -158,7 +183,7 @@ export default function DashboardScreen() {
           )}
         </ChartCard>
 
-        <ChartCard title="Gasto mensual" icon="calendar-outline">
+        <ChartCard title="Gasto mensual" icon="calendar-range">
           {hasRecords ? (
             <LineChart
               data={monthlyChartData}
@@ -186,14 +211,16 @@ function StatCard({
   label,
   value,
 }: {
-  icon: IoniconName;
+  icon: DashboardIconName;
   label: string;
   value: string;
 }) {
+  const Icon = dashboardIcons[icon];
+
   return (
     <View style={styles.statCard}>
       <View style={styles.statIcon}>
-        <Ionicons name={icon} size={20} color="#7bf1ad" />
+        <Icon size={20} color="#7bf1ad" />
       </View>
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
@@ -207,13 +234,15 @@ function ChartCard({
   children,
 }: {
   title: string;
-  icon: IoniconName;
+  icon: DashboardIconName;
   children: React.ReactNode;
 }) {
+  const Icon = dashboardIcons[icon];
+
   return (
     <View style={styles.chartCard}>
       <View style={styles.chartHeader}>
-        <Ionicons name={icon} size={20} color="#7bf1ad" />
+        <Icon size={20} color="#7bf1ad" />
         <Text style={styles.chartTitle}>{title}</Text>
       </View>
 
@@ -225,7 +254,7 @@ function ChartCard({
 function EmptyGraph({ text }: { text: string }) {
   return (
     <View style={styles.emptyGraph}>
-      <Ionicons name="information-circle-outline" size={24} color="#7bf1ad" />
+      <Info size={24} color="#7bf1ad" />
       <Text style={styles.emptyText}>{text}</Text>
     </View>
   );

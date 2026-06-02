@@ -1,5 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { CalendarDays, ChevronDown, Save, X } from "lucide-react-native";
 import { useState } from "react";
 import {
     Alert,
@@ -99,12 +99,12 @@ export default function RegistroScreen() {
               onPress={() => setCalendarVisible(true)}
             >
               <View style={styles.dateLeft}>
-                <Ionicons name="calendar-outline" size={18} color="#d7edf6" />
+                <CalendarDays size={18} color="#d7edf6" />
                 <Text style={styles.dateButtonText}>
                   {formatDisplayDate(date)}
                 </Text>
               </View>
-              <Ionicons name="chevron-down" size={18} color="#9fc0cf" />
+              <ChevronDown size={18} color="#9fc0cf" />
             </Pressable>
 
             <Text style={styles.label}>Kilometraje actual</Text>
@@ -138,7 +138,7 @@ export default function RegistroScreen() {
             />
 
             <Pressable style={styles.button} onPress={saveRecord}>
-              <Ionicons name="save-outline" size={19} color="#06110b" />
+              <Save size={19} color="#06110b" />
               <Text style={styles.buttonText}>Guardar carga</Text>
             </Pressable>
           </View>
@@ -156,7 +156,7 @@ export default function RegistroScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Selecciona una fecha</Text>
               <Pressable onPress={() => setCalendarVisible(false)}>
-                <Ionicons name="close" size={22} color="#d7edf6" />
+                <X size={22} color="#d7edf6" />
               </Pressable>
             </View>
 

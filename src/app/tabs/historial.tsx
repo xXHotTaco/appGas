@@ -1,5 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
+import { BadgeDollarSign, Droplet, ReceiptText, Tag } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import {
     Alert,
@@ -60,7 +60,7 @@ export default function HistorialScreen() {
 
         {records.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="receipt-outline" size={38} color="#7bf1ad" />
+            <ReceiptText size={38} color="#7bf1ad" />
             <Text style={styles.emptyTitle}>Sin registros todavía</Text>
             <Text style={styles.emptyText}>
               Ve a Registro y agrega tu primera carga.
@@ -89,15 +89,15 @@ export default function HistorialScreen() {
 
                 <View style={styles.recordDetails}>
                   <DetailPill
-                    icon="water-outline"
+                    icon="water"
                     text={`${item.liters.toFixed(1)} L`}
                   />
                   <DetailPill
-                    icon="cash-outline"
+                    icon="money"
                     text={`$${item.totalPaid.toFixed(2)}`}
                   />
                   <DetailPill
-                    icon="pricetag-outline"
+                    icon="tag"
                     text={`$${pricePerLiter.toFixed(2)}/L`}
                   />
                 </View>
@@ -114,12 +114,15 @@ function DetailPill({
   icon,
   text,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: "water" | "money" | "tag";
   text: string;
 }) {
+  const Icon =
+    icon === "water" ? Droplet : icon === "money" ? BadgeDollarSign : Tag;
+
   return (
     <View style={styles.pill}>
-      <Ionicons name={icon} size={14} color="#8cecb8" />
+      <Icon size={14} color="#8cecb8" />
       <Text style={styles.pillText}>{text}</Text>
     </View>
   );
