@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
+import { CircleGauge } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
     Dimensions,
@@ -24,6 +25,7 @@ import { FuelRecord } from "../../types/fuel";
 
 const screenWidth = Dimensions.get("window").width;
 const chartWidth = Math.max(screenWidth - 42, 320);
+type IoniconName = keyof typeof Ionicons.glyphMap;
 
 export default function DashboardScreen() {
   const [records, setRecords] = useState<FuelRecord[]>([]);
@@ -70,7 +72,7 @@ export default function DashboardScreen() {
           </View>
 
           <View style={styles.heroIcon}>
-            <Ionicons name="speedometer-outline" size={30} color="#7bf1ad" />
+            <CircleGauge size={30} color="#7bf1ad" />
           </View>
         </View>
 
@@ -184,7 +186,7 @@ function StatCard({
   label,
   value,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IoniconName;
   label: string;
   value: string;
 }) {
@@ -205,7 +207,7 @@ function ChartCard({
   children,
 }: {
   title: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IoniconName;
   children: React.ReactNode;
 }) {
   return (
