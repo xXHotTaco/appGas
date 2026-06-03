@@ -9,8 +9,8 @@ import {
   Save,
   X,
 } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementType } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -270,7 +270,7 @@ export default function RegistroScreen() {
             <Text style={styles.kicker}>Nueva carga</Text>
             <Text style={styles.title}>Registro</Text>
             <Text style={styles.subtitle}>
-              Guarda litros, precio y odometro en la API.
+              Guarda litros, precio y odometro.
             </Text>
           </View>
 

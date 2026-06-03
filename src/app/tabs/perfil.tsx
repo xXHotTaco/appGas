@@ -1,11 +1,12 @@
+import { router } from "expo-router";
 import {
   LogOut,
   Mail,
   RefreshCw,
-  Server,
   ShieldCheck,
   User,
 } from "lucide-react-native";
+import type { ElementType } from "react";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -17,14 +18,13 @@ import {
   Text,
   View,
 } from "react-native";
-import type { ElementType } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { API_URL } from "@/lib/api";
 
 export default function PerfilScreen() {
   const { logout, refreshMe, user } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   async function handleRefresh() {
     try {
@@ -40,13 +40,27 @@ export default function PerfilScreen() {
     }
   }
 
+  async function handleLogout() {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      router.replace("/login");
+    } catch (error) {
+      Alert.alert(
+        "No se pudo cerrar sesion",
+        error instanceof Error ? error.message : "Intentalo de nuevo.",
+      );
+      setIsLoggingOut(false);
+    }
+  }
+
   function confirmLogout() {
     Alert.alert("Cerrar sesion", "Quieres salir de appGas?", [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Salir",
         style: "destructive",
-        onPress: logout,
+        onPress: handleLogout,
       },
     ]);
   }
@@ -78,7 +92,6 @@ export default function PerfilScreen() {
           label="Token"
           value="Sesion protegida"
         />
-        <InfoRow icon={Server} label="API" value={API_URL} />
 
         <Pressable
           disabled={isRefreshing}
@@ -99,14 +112,21 @@ export default function PerfilScreen() {
         </Pressable>
 
         <Pressable
+          disabled={isLoggingOut}
           onPress={confirmLogout}
           style={({ pressed }) => [
             styles.logoutButton,
-            pressed && styles.buttonPressed,
+            (pressed || isLoggingOut) && styles.buttonPressed,
           ]}
         >
-          <LogOut size={18} color="#ff9aa5" />
-          <Text style={styles.logoutText}>Cerrar sesion</Text>
+          {isLoggingOut ? (
+            <ActivityIndicator color="#ff9aa5" />
+          ) : (
+            <>
+              <LogOut size={18} color="#ff9aa5" />
+              <Text style={styles.logoutText}>Cerrar sesion</Text>
+            </>
+          )}
         </Pressable>
       </ScrollView>
     </SafeAreaView>
