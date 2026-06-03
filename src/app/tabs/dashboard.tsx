@@ -25,13 +25,17 @@ import {
 } from "react-native";
 import { BarChart, LineChart } from "react-native-chart-kit";
 
+import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { getGasRecords, getStats } from "@/lib/api";
 import { formatDisplayDate, shortDate } from "@/lib/fuelStats";
 import type { GasRecord, StatsResponse } from "@/types/fuel";
 
 const screenWidth = Dimensions.get("window").width;
-const chartWidth = Math.max(screenWidth - 42, 320);
+const chartWidth = Math.max(
+  Math.min(screenWidth - 42, APP_CONTENT_MAX_WIDTH - 36),
+  320,
+);
 
 type DashboardIconName =
   | "money"
@@ -448,6 +452,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#08131b",
   },
   container: {
+    width: "100%",
+    maxWidth: APP_CONTENT_MAX_WIDTH,
+    alignSelf: "center",
     padding: 18,
     paddingBottom: 110,
   },
@@ -522,11 +529,12 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    justifyContent: "space-between",
+    rowGap: 12,
     marginBottom: 16,
   },
   statCard: {
-    width: "48%",
+    width: "49%",
     minHeight: 128,
     backgroundColor: "#133042",
     borderRadius: 24,

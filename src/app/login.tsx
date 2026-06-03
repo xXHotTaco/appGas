@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { AUTH_CONTENT_MAX_WIDTH } from "@/constants/layout";
 import { ApiError } from "@/lib/api";
 
 type LoginToast = {
@@ -202,6 +203,9 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: "center",
+    width: "100%",
+    maxWidth: AUTH_CONTENT_MAX_WIDTH,
+    alignSelf: "center",
     padding: 18,
   },
   hero: {
