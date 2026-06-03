@@ -4,34 +4,32 @@
     "slug": "appGas",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/appgas-icon.png",
+    "icon": "./assets/images/appgas-logo-1024.png",
     "scheme": "appgas",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/appgas-logo-1024.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/appgas-adaptive-icon.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#08131B",
+        "foregroundImage": "./assets/images/appgas-adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/appgas-favicon.png"
+      "favicon": "./assets/images/appgas-logo-192.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#08131B",
           "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "image": "./assets/images/appgas-logo-512.png",
+            "imageWidth": 96
           }
         }
       ]

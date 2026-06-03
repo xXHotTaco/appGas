@@ -22,6 +22,7 @@ import {
 } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
 import { deleteGasRecord, getGasRecords } from "@/lib/api";
 import { formatDisplayDate } from "@/lib/fuelStats";
 import type { GasRecord } from "@/types/fuel";
@@ -265,6 +266,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#08131b",
   },
   container: {
+    width: "100%",
+    maxWidth: APP_CONTENT_MAX_WIDTH,
+    alignSelf: "center",
     padding: 18,
     paddingBottom: 110,
   },

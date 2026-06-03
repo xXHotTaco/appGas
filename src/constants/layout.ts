@@ -1,0 +1,2 @@
+export const AUTH_CONTENT_MAX_WIDTH = 520;
+export const APP_CONTENT_MAX_WIDTH = 760;

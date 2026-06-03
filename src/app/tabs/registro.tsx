@@ -31,6 +31,7 @@ import {
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 
+import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { createGasRecord, getVehicles } from "@/lib/api";
 import { formatDisplayDate, getToday } from "@/lib/fuelStats";
@@ -591,6 +592,9 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   container: {
+    width: "100%",
+    maxWidth: APP_CONTENT_MAX_WIDTH,
+    alignSelf: "center",
     padding: 18,
     paddingBottom: 110,
   },

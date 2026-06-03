@@ -17,6 +17,7 @@ import {
 } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
 import { createVehicle, getVehicles } from "@/lib/api";
 import type { Vehicle } from "@/types/fuel";
 
@@ -212,6 +213,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#08131b",
   },
   container: {
+    width: "100%",
+    maxWidth: APP_CONTENT_MAX_WIDTH,
+    alignSelf: "center",
     padding: 18,
     paddingBottom: 110,
   },

@@ -20,6 +20,7 @@ import {
 } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
 
 export default function PerfilScreen() {
   const { logout, refreshMe, user } = useAuth();
@@ -150,6 +151,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#08131b",
   },
   container: {
+    width: "100%",
+    maxWidth: APP_CONTENT_MAX_WIDTH,
+    alignSelf: "center",
     padding: 18,
     paddingBottom: 110,
   },
