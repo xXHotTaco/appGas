@@ -1,56 +1,169 @@
-# Welcome to your Expo app 👋
+# appGas
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+<p align="center">
+  <img src="./assets/images/appgas-logo-192.png" width="120" alt="appGas logo" />
+</p>
 
-## Get started
+<p align="center">
+  Controla tus cargas de gasolina, el gasto real y el rendimiento de cada recorrido desde una sola app.
+</p>
 
-1. Install dependencies
+<p align="center">
+  <img alt="Expo SDK 56" src="https://img.shields.io/badge/Expo-SDK%2056-08131B?style=for-the-badge&logo=expo&logoColor=white" />
+  <img alt="React Native 0.85" src="https://img.shields.io/badge/React%20Native-0.85-102330?style=for-the-badge&logo=react&logoColor=61dafb" />
+  <img alt="Expo Router" src="https://img.shields.io/badge/Expo%20Router-file--based-16D26B?style=for-the-badge&logo=reactrouter&logoColor=06110B" />
+  <img alt="Web static export" src="https://img.shields.io/badge/Web-static%20export-173344?style=for-the-badge" />
+</p>
 
-   ```bash
-   npm install
-   ```
+## De que va
 
-2. Start the app
+`appGas` es una app hecha con Expo para registrar cargas de gasolina, asociarlas a vehiculos y convertir esos datos en indicadores utiles:
 
-   ```bash
-   npx expo start
-   ```
+- cuanto llevas gastado
+- cuantos litros has cargado
+- cual es tu precio promedio por litro
+- como cambia tu rendimiento en km/L
+- cuanto te cuesta realmente cada km
 
-In the output, you'll find options to open the app in a
+La app corre en `iOS`, `Android` y `web`, usa `Expo Router` para navegacion por archivos y conserva la sesion del usuario con `AsyncStorage`.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Lo que ya incluye
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- Login y registro con persistencia de sesion.
+- Dashboard con resumen total, gasto mensual, litros mensuales, rendimiento y costo por km.
+- Registro de cargas con fecha, odometro, litros, precio por litro, notas y bandera de tanque lleno.
+- Gestion de vehiculos con nombre y capacidad de tanque.
+- Historial de cargas con eliminacion en dos pasos para evitar borrados accidentales.
+- Export web estatico via `expo export`.
 
-## Get a fresh project
+## Flujo de uso
 
-When you're ready, run:
+1. El usuario crea cuenta o inicia sesion.
+2. Agrega uno o varios vehiculos.
+3. Registra cada carga de gasolina.
+4. Consulta el dashboard para ver tendencias y eficiencia.
 
-```bash
-npm run reset-project
+## Pantallas principales
+
+- `src/app/login.tsx`: acceso de usuarios.
+- `src/app/register.tsx`: alta de cuenta con validaciones.
+- `src/app/tabs/dashboard.tsx`: metricas y graficas.
+- `src/app/tabs/registro.tsx`: captura de nuevas cargas.
+- `src/app/tabs/historial.tsx`: consulta y eliminacion de registros.
+- `src/app/tabs/vehiculos.tsx`: alta y listado de vehiculos.
+- `src/app/tabs/perfil.tsx`: datos del usuario y cierre de sesion.
+
+## Stack
+
+| Capa | Herramientas |
+| --- | --- |
+| App | Expo `~56.0.8`, React Native `0.85.3`, React `19.2.3` |
+| Navegacion | `expo-router ~56.2.8` |
+| Estado de sesion | Context API + `@react-native-async-storage/async-storage` |
+| UI | `lucide-react-native`, `expo-image`, `expo-glass-effect`, `@expo/ui` |
+| Visualizacion | `react-native-chart-kit`, `react-native-svg`, `react-native-calendars` |
+| Plataformas | Android, iOS y web con `react-native-web` |
+
+## Estructura
+
+```text
+src/
+  app/
+    _layout.tsx
+    index.tsx
+    login.tsx
+    register.tsx
+    tabs/
+      _layout.tsx
+      dashboard.tsx
+      registro.tsx
+      historial.tsx
+      vehiculos.tsx
+      perfil.tsx
+  components/
+  constants/
+  contexts/
+  hooks/
+  lib/
+  types/
+assets/
+public/
+scripts/
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Setup rapido
 
-### Other setup steps
+### 1. Instala dependencias
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npm install
+```
 
-## Learn more
+### 2. Configura la URL del backend
 
-To learn more about developing your project with Expo, look at the following resources:
+Crea un archivo `.env` en la raiz:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+EXPO_PUBLIC_API_URL=http://127.0.0.1:8787
+```
 
-## Join the community
+Si vas a probar la app desde un telefono fisico, no uses `127.0.0.1`. Cambialo por la IP local de tu maquina, por ejemplo:
 
-Join our community of developers creating universal apps.
+```bash
+EXPO_PUBLIC_API_URL=http://192.168.1.20:8787
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Si no defines esa variable, la app usa por defecto `http://127.0.0.1:8787`.
+
+### 3. Levanta la app
+
+```bash
+npm run start
+```
+
+Tambien puedes abrir directo por plataforma:
+
+```bash
+npm run android
+npm run ios
+npm run web
+```
+
+## Scripts utiles
+
+| Comando | Que hace |
+| --- | --- |
+| `npm run start` | Inicia Expo |
+| `npm run android` | Abre el proyecto en Android |
+| `npm run ios` | Abre el proyecto en iOS |
+| `npm run web` | Abre la version web |
+| `npm run build:web` | Genera export estatico en `dist/` |
+| `npm run lint` | Ejecuta `expo lint` |
+| `npm run reset-project` | Resetea el proyecto base de Expo |
+
+## API esperada
+
+La app hoy consume estos endpoints:
+
+| Metodo | Ruta | Uso |
+| --- | --- | --- |
+| `POST` | `/auth/register` | Crear cuenta |
+| `POST` | `/auth/login` | Iniciar sesion |
+| `GET` | `/api/me` | Obtener usuario autenticado |
+| `GET` | `/api/vehicles` | Listar vehiculos |
+| `POST` | `/api/vehicles` | Crear vehiculo |
+| `GET` | `/api/gas-records` | Listar cargas |
+| `POST` | `/api/gas-records` | Crear carga |
+| `DELETE` | `/api/gas-records/:id` | Eliminar carga |
+| `GET` | `/api/stats` | Obtener resumen y eficiencia |
+
+## Notas de Expo
+
+- Este proyecto esta montado sobre `Expo SDK 56`.
+- Si vas a tocar configuracion, router o build, usa la documentacion versionada: `https://docs.expo.dev/versions/v56.0.0/`
+- En SDK 55+ `src/app` es una estructura valida para Expo Router sin configuracion extra, y este proyecto ya sigue ese esquema.
+- La salida web esta configurada como `static` en `app.json`.
+
+## Idea de producto
+
+`appGas` no busca solo guardar tickets. Busca convertir cada carga en una lectura clara del costo real de mover un vehiculo. Si el usuario captura bien fecha, litros, precio y odometro, el dashboard deja de ser decoracion y se vuelve una herramienta de control.
