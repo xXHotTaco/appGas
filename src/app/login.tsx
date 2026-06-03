@@ -1,5 +1,5 @@
 import { Link } from "expo-router";
-import { LogIn } from "lucide-react-native";
+import { Eye, EyeOff, LogIn } from "lucide-react-native";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -21,6 +21,7 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleLogin() {
@@ -67,23 +68,44 @@ export default function LoginScreen() {
               autoComplete="email"
               keyboardType="email-address"
               onChangeText={setEmail}
-              placeholder="david@test.com"
+              placeholder="hola@test.com"
               placeholderTextColor="#7f97a3"
               style={styles.input}
               value={email}
             />
 
             <Text style={styles.label}>Contrasena</Text>
-            <TextInput
-              autoCapitalize="none"
-              autoComplete="password"
-              onChangeText={setPassword}
-              placeholder="123456"
-              placeholderTextColor="#7f97a3"
-              secureTextEntry
-              style={styles.input}
-              value={password}
-            />
+            <View style={styles.passwordRow}>
+              <TextInput
+                autoCapitalize="none"
+                autoComplete="password"
+                onChangeText={setPassword}
+                placeholder="123456"
+                placeholderTextColor="#7f97a3"
+                secureTextEntry={!isPasswordVisible}
+                style={[styles.input, styles.passwordInput]}
+                value={password}
+              />
+              <Pressable
+                accessibilityLabel={
+                  isPasswordVisible
+                    ? "Ocultar contrasena"
+                    : "Mostrar contrasena"
+                }
+                accessibilityRole="button"
+                onPress={() => setIsPasswordVisible((current) => !current)}
+                style={({ pressed }) => [
+                  styles.eyeButton,
+                  pressed && styles.eyeButtonPressed,
+                ]}
+              >
+                {isPasswordVisible ? (
+                  <EyeOff size={21} color="#a9c7d4" />
+                ) : (
+                  <Eye size={21} color="#a9c7d4" />
+                )}
+              </Pressable>
+            </View>
 
             <Pressable
               disabled={isSubmitting}
@@ -177,6 +199,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1f3a49",
     marginBottom: 14,
+  },
+  passwordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#0b1821",
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#1f3a49",
+    marginBottom: 14,
+  },
+  passwordInput: {
+    flex: 1,
+    borderWidth: 0,
+    marginBottom: 0,
+    paddingRight: 8,
+  },
+  eyeButton: {
+    width: 48,
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  eyeButtonPressed: {
+    opacity: 0.7,
   },
   button: {
     minHeight: 54,
