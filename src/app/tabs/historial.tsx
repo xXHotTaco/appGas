@@ -1,109 +1,204 @@
 import { useFocusEffect } from "expo-router";
-import { BadgeDollarSign, Droplet, ReceiptText, Tag } from "lucide-react-native";
+import {
+  BadgeDollarSign,
+  Car,
+  Droplet,
+  Gauge,
+  Info,
+  ReceiptText,
+  Tag,
+  Trash2,
+} from "lucide-react-native";
 import { useCallback, useState } from "react";
 import {
-    Alert,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
-import { formatDisplayDate } from "../../lib/fuelStats";
 
-import { deleteFuelRecord, getFuelRecords } from "@/lib/fuelSore";
-import { FuelRecord } from "../../types/fuel";
+import { useAuth } from "@/contexts/AuthContext";
+import { deleteGasRecord, getGasRecords } from "@/lib/api";
+import { formatDisplayDate } from "@/lib/fuelStats";
+import type { GasRecord } from "@/types/fuel";
 
 export default function HistorialScreen() {
-  const [records, setRecords] = useState<FuelRecord[]>([]);
+  const { token } = useAuth();
+  const [records, setRecords] = useState<GasRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const loadData = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      setError("");
+      const data = await getGasRecords(token);
+      setRecords(sortRecordsDesc(data.records || []));
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "No se pudo cargar el historial.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
+      setIsLoading(true);
       loadData();
-    }, []),
+    }, [loadData]),
   );
 
-  async function loadData() {
-    const data = await getFuelRecords();
-    setRecords(data);
-  }
-
   function confirmDelete(id: string) {
-    Alert.alert(
-      "Eliminar registro",
-      "¿Seguro que quieres eliminar esta carga?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            const updated = await deleteFuelRecord(id);
-            setRecords(updated);
-          },
+    Alert.alert("Eliminar registro", "Seguro que quieres eliminar esta carga?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          if (!token) return;
+
+          try {
+            setDeletingId(id);
+            await deleteGasRecord(token, id);
+            setRecords((current) =>
+              current.filter((record) => record.id !== id),
+            );
+          } catch (deleteError) {
+            Alert.alert(
+              "No se elimino",
+              deleteError instanceof Error
+                ? deleteError.message
+                : "Intentalo de nuevo.",
+            );
+          } finally {
+            setDeletingId(null);
+          }
         },
-      ],
-    );
+      },
+    ]);
   }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={() => {
+              setIsLoading(true);
+              loadData();
+            }}
+            tintColor="#7bf1ad"
+          />
+        }
+      >
         <View style={styles.hero}>
           <Text style={styles.kicker}>Tus cargas</Text>
           <Text style={styles.title}>Historial</Text>
-          <Text style={styles.subtitle}>
-            Consulta y elimina registros guardados.
-          </Text>
+          <Text style={styles.subtitle}>Lista conectada a Cloudflare D1.</Text>
         </View>
 
-        {records.length === 0 ? (
+        {error ? (
+          <View style={styles.errorBanner}>
+            <Info size={18} color="#ffb3bd" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        {isLoading && records.length === 0 ? (
+          <View style={styles.empty}>
+            <ActivityIndicator color="#7bf1ad" size="large" />
+            <Text style={styles.emptyTitle}>Cargando historial</Text>
+          </View>
+        ) : records.length === 0 ? (
           <View style={styles.empty}>
             <ReceiptText size={38} color="#7bf1ad" />
-            <Text style={styles.emptyTitle}>Sin registros todavía</Text>
+            <Text style={styles.emptyTitle}>Sin registros todavia</Text>
             <Text style={styles.emptyText}>
               Ve a Registro y agrega tu primera carga.
             </Text>
           </View>
         ) : (
-          records.map((item) => {
-            const pricePerLiter = item.totalPaid / item.liters;
-
-            return (
-              <View style={styles.recordCard} key={item.id}>
-                <View style={styles.recordTop}>
-                  <View>
-                    <Text style={styles.recordDate}>
-                      {formatDisplayDate(item.date)}
-                    </Text>
-                    <Text style={styles.recordKm}>
-                      {item.odometerKm.toLocaleString("es-MX")} km
-                    </Text>
-                  </View>
-
-                  <Pressable onPress={() => confirmDelete(item.id)}>
-                    <Text style={styles.delete}>Eliminar</Text>
-                  </Pressable>
+          records.map((item) => (
+            <View style={styles.recordCard} key={item.id}>
+              <View style={styles.recordTop}>
+                <View style={styles.recordTitleWrap}>
+                  <Text style={styles.recordDate}>
+                    {formatDisplayDate(item.fill_date)}
+                  </Text>
+                  <Text style={styles.recordKm}>
+                    {item.odometer_km
+                      ? `${item.odometer_km.toLocaleString("es-MX")} km`
+                      : "Odometro sin capturar"}
+                  </Text>
                 </View>
 
-                <View style={styles.recordDetails}>
-                  <DetailPill
-                    icon="water"
-                    text={`${item.liters.toFixed(1)} L`}
-                  />
-                  <DetailPill
-                    icon="money"
-                    text={`$${item.totalPaid.toFixed(2)}`}
-                  />
-                  <DetailPill
-                    icon="tag"
-                    text={`$${pricePerLiter.toFixed(2)}/L`}
-                  />
-                </View>
+                <Pressable
+                  disabled={deletingId === item.id}
+                  onPress={() => confirmDelete(item.id)}
+                  style={({ pressed }) => [
+                    styles.deleteButton,
+                    (pressed || deletingId === item.id) &&
+                      styles.deleteButtonPressed,
+                  ]}
+                >
+                  {deletingId === item.id ? (
+                    <ActivityIndicator color="#ff9aa5" />
+                  ) : (
+                    <>
+                      <Trash2 size={15} color="#ff7c87" />
+                      <Text style={styles.delete}>Eliminar</Text>
+                    </>
+                  )}
+                </Pressable>
               </View>
-            );
-          })
+
+              <View style={styles.vehicleRow}>
+                <Car size={15} color="#8cecb8" />
+                <Text style={styles.vehicleText}>
+                  {item.vehicle_name || "Sin vehiculo"}
+                </Text>
+                <Text style={styles.fullTankText}>
+                  {item.is_full_tank ? "Tanque lleno" : "Carga parcial"}
+                </Text>
+              </View>
+
+              <View style={styles.recordDetails}>
+                <DetailPill
+                  icon="water"
+                  text={`${item.liters.toFixed(1)} L`}
+                />
+                <DetailPill
+                  icon="money"
+                  text={formatMoney(item.total_cost)}
+                />
+                <DetailPill
+                  icon="tag"
+                  text={`${formatMoney(item.price_per_liter)}/L`}
+                />
+                {item.odometer_km ? (
+                  <DetailPill
+                    icon="gauge"
+                    text={`${item.odometer_km.toLocaleString("es-MX")} km`}
+                  />
+                ) : null}
+              </View>
+
+              {item.notes ? <Text style={styles.notes}>{item.notes}</Text> : null}
+            </View>
+          ))
         )}
       </ScrollView>
     </SafeAreaView>
@@ -114,11 +209,17 @@ function DetailPill({
   icon,
   text,
 }: {
-  icon: "water" | "money" | "tag";
+  icon: "water" | "money" | "tag" | "gauge";
   text: string;
 }) {
   const Icon =
-    icon === "water" ? Droplet : icon === "money" ? BadgeDollarSign : Tag;
+    icon === "water"
+      ? Droplet
+      : icon === "money"
+        ? BadgeDollarSign
+        : icon === "gauge"
+          ? Gauge
+          : Tag;
 
   return (
     <View style={styles.pill}>
@@ -126,6 +227,20 @@ function DetailPill({
       <Text style={styles.pillText}>{text}</Text>
     </View>
   );
+}
+
+function sortRecordsDesc(records: GasRecord[]) {
+  return [...records].sort(
+    (a, b) =>
+      new Date(b.fill_date).getTime() - new Date(a.fill_date).getTime(),
+  );
+}
+
+function formatMoney(value: number) {
+  return `$${value.toLocaleString("es-MX", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 const styles = StyleSheet.create({
@@ -160,6 +275,22 @@ const styles = StyleSheet.create({
     color: "#a9c7d4",
     marginTop: 4,
   },
+  errorBanner: {
+    backgroundColor: "#321720",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#66303e",
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  errorText: {
+    color: "#ffd9de",
+    flex: 1,
+    fontWeight: "700",
+  },
   empty: {
     backgroundColor: "#102330",
     borderRadius: 28,
@@ -190,7 +321,11 @@ const styles = StyleSheet.create({
   recordTop: {
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 12,
     marginBottom: 12,
+  },
+  recordTitleWrap: {
+    flex: 1,
   },
   recordDate: {
     color: "#ffffff",
@@ -201,9 +336,42 @@ const styles = StyleSheet.create({
     color: "#a4c5d3",
     marginTop: 4,
   },
+  deleteButton: {
+    height: 36,
+    minWidth: 92,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#5a2b34",
+    backgroundColor: "#2b141b",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  deleteButtonPressed: {
+    opacity: 0.75,
+  },
   delete: {
     color: "#ff7c87",
     fontWeight: "900",
+    fontSize: 12,
+  },
+  vehicleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  vehicleText: {
+    color: "#dff7e9",
+    fontWeight: "900",
+  },
+  fullTankText: {
+    color: "#9fc0cf",
+    fontSize: 12,
+    fontWeight: "800",
   },
   recordDetails: {
     flexDirection: "row",
@@ -225,5 +393,10 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontWeight: "800",
     fontSize: 12,
+  },
+  notes: {
+    color: "#b8d1dd",
+    marginTop: 12,
+    lineHeight: 20,
   },
 });

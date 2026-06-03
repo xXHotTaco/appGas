@@ -1,99 +1,144 @@
 import { useFocusEffect } from "expo-router";
 import {
   BadgeDollarSign,
-  CalendarDays,
   CalendarRange,
   ChartColumn,
   CircleGauge,
   Droplets,
+  Fuel,
   Info,
+  ReceiptText,
+  Tag,
   TrendingUp,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
+import type { ElementType } from "react";
 import {
-    Dimensions,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { BarChart, LineChart } from "react-native-chart-kit";
-import {
-    calculateStats,
-    formatDisplayDate,
-    getEfficiencyChartData,
-    getLitersChartData,
-    getMonthlySpendingChartData,
-    getSpendingChartData,
-} from "../../lib/fuelStats";
 
-import { getFuelRecords } from "@/lib/fuelSore";
-import { FuelRecord } from "../../types/fuel";
+import { useAuth } from "@/contexts/AuthContext";
+import { getGasRecords, getStats } from "@/lib/api";
+import { formatDisplayDate, shortDate } from "@/lib/fuelStats";
+import type { GasRecord, StatsResponse } from "@/types/fuel";
 
 const screenWidth = Dimensions.get("window").width;
 const chartWidth = Math.max(screenWidth - 42, 320);
+
 type DashboardIconName =
   | "money"
   | "trend"
   | "water"
-  | "calendar"
   | "chart"
   | "calendar-range"
-  | "info";
+  | "info"
+  | "fuel"
+  | "tag"
+  | "receipt";
 
 const dashboardIcons = {
   money: BadgeDollarSign,
   trend: TrendingUp,
   water: Droplets,
-  calendar: CalendarDays,
   chart: ChartColumn,
   "calendar-range": CalendarRange,
   info: Info,
-} satisfies Record<DashboardIconName, React.ElementType>;
+  fuel: Fuel,
+  tag: Tag,
+  receipt: ReceiptText,
+} satisfies Record<DashboardIconName, ElementType>;
 
 export default function DashboardScreen() {
-  const [records, setRecords] = useState<FuelRecord[]>([]);
+  const { token } = useAuth();
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [records, setRecords] = useState<GasRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadData = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      setError("");
+      const [statsData, recordsData] = await Promise.all([
+        getStats(token),
+        getGasRecords(token),
+      ]);
+
+      setStats({
+        summary: statsData.summary,
+        monthly: statsData.monthly || [],
+        efficiency: statsData.efficiency || [],
+      });
+      setRecords(sortRecordsDesc(recordsData.records || []));
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "No se pudo cargar el dashboard.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
+      setIsLoading(true);
       loadData();
-    }, []),
+    }, [loadData]),
   );
 
-  async function loadData() {
-    const data = await getFuelRecords();
-    setRecords(data);
-  }
-
-  const stats = useMemo(() => calculateStats(records), [records]);
-  const spendingChartData = useMemo(
-    () => getSpendingChartData(records),
-    [records],
+  const summary = stats?.summary;
+  const monthlySpentChart = useMemo(
+    () => buildMonthlyChart(stats?.monthly || [], "spent"),
+    [stats?.monthly],
   );
-  const litersChartData = useMemo(() => getLitersChartData(records), [records]);
-  const efficiencyChartData = useMemo(
-    () => getEfficiencyChartData(records),
-    [records],
+  const monthlyLitersChart = useMemo(
+    () => buildMonthlyChart(stats?.monthly || [], "liters"),
+    [stats?.monthly],
   );
-  const monthlyChartData = useMemo(
-    () => getMonthlySpendingChartData(records),
-    [records],
+  const efficiencyChart = useMemo(
+    () => buildEfficiencyChart(stats?.efficiency || [], "km_per_liter"),
+    [stats?.efficiency],
   );
-
-  const hasRecords = records.length > 0;
-  const hasEfficiency = efficiencyChartData.labels.length > 0;
+  const costPerKmChart = useMemo(
+    () => buildEfficiencyChart(stats?.efficiency || [], "cost_per_km"),
+    [stats?.efficiency],
+  );
+  const latestEfficiency =
+    stats?.efficiency && stats.efficiency.length > 0
+      ? stats.efficiency[stats.efficiency.length - 1]
+      : null;
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={() => {
+              setIsLoading(true);
+              loadData();
+            }}
+            tintColor="#7bf1ad"
+          />
+        }
+      >
         <View style={styles.hero}>
-          <View>
+          <View style={styles.heroCopy}>
             <Text style={styles.kicker}>appGas</Text>
             <Text style={styles.title}>Dashboard</Text>
-            <Text style={styles.subtitle}>
-              Tu resumen, tendencias y próxima carga.
-            </Text>
+            <Text style={styles.subtitle}>Resumen real de tus cargas.</Text>
           </View>
 
           <View style={styles.heroIcon}>
@@ -101,106 +146,162 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        <View style={styles.statsGrid}>
-          <StatCard
-            icon="money"
-            label="Gasto del mes"
-            value={`$${stats.monthlySpent.toFixed(2)}`}
-          />
-          <StatCard
-            icon="trend"
-            label="Rendimiento"
-            value={`${stats.averageKmPerLiter.toFixed(2)} km/L`}
-          />
-          <StatCard
-            icon="water"
-            label="Litros totales"
-            value={`${stats.totalLiters.toFixed(1)} L`}
-          />
-          <StatCard
-            icon="calendar"
-            label="Próxima carga"
-            value={
-              stats.nextFillDate
-                ? formatDisplayDate(stats.nextFillDate)
-                : "Sin datos"
-            }
-          />
-        </View>
+        {error ? <ErrorBanner text={error} /> : null}
 
-        <ChartCard title="Gasto por carga" icon="chart">
-          {hasRecords ? (
-            <BarChart
-              data={spendingChartData}
-              width={chartWidth}
-              height={230}
-              yAxisLabel="$"
-              yAxisSuffix=""
-              fromZero
-              showValuesOnTopOfBars
-              withInnerLines={false}
-              chartConfig={chartConfig}
-              style={styles.chart}
-            />
-          ) : (
-            <EmptyGraph text="Agrega registros para ver esta gráfica." />
-          )}
-        </ChartCard>
+        {isLoading && !summary ? (
+          <View style={styles.loadingCard}>
+            <ActivityIndicator color="#7bf1ad" size="large" />
+            <Text style={styles.loadingText}>Cargando datos</Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.statsGrid}>
+              <StatCard
+                icon="money"
+                label="Total gastado"
+                value={formatMoney(summary?.total_spent || 0)}
+              />
+              <StatCard
+                icon="water"
+                label="Litros"
+                value={`${formatNumber(summary?.total_liters || 0, 1)} L`}
+              />
+              <StatCard
+                icon="tag"
+                label="Precio promedio"
+                value={`${formatMoney(summary?.avg_price_per_liter || 0)}/L`}
+              />
+              <StatCard
+                icon="receipt"
+                label="Cargas"
+                value={`${summary?.total_records || 0}`}
+              />
+              <StatCard
+                icon="trend"
+                label="Rendimiento"
+                value={
+                  latestEfficiency
+                    ? `${formatNumber(latestEfficiency.km_per_liter, 2)} km/L`
+                    : "Sin datos"
+                }
+              />
+              <StatCard
+                icon="fuel"
+                label="Costo por km"
+                value={
+                  latestEfficiency
+                    ? formatMoney(latestEfficiency.cost_per_km)
+                    : "Sin datos"
+                }
+              />
+            </View>
 
-        <ChartCard title="Rendimiento km/L" icon="trend">
-          {hasEfficiency ? (
-            <LineChart
-              data={efficiencyChartData}
-              width={chartWidth}
-              height={230}
-              fromZero
-              bezier
-              withShadow={false}
-              chartConfig={chartConfig}
-              style={styles.chart}
-            />
-          ) : (
-            <EmptyGraph text="Necesitas al menos 2 registros para calcular rendimiento." />
-          )}
-        </ChartCard>
+            <ChartCard title="Gasto mensual" icon="calendar-range">
+              {monthlySpentChart.labels.length > 0 ? (
+                <BarChart
+                  data={monthlySpentChart}
+                  width={chartWidth}
+                  height={230}
+                  yAxisLabel="$"
+                  yAxisSuffix=""
+                  fromZero
+                  showValuesOnTopOfBars
+                  withInnerLines={false}
+                  chartConfig={chartConfig}
+                  style={styles.chart}
+                />
+              ) : (
+                <EmptyGraph text="Agrega registros para ver esta grafica." />
+              )}
+            </ChartCard>
 
-        <ChartCard title="Litros por carga" icon="water">
-          {hasRecords ? (
-            <BarChart
-              data={litersChartData}
-              width={chartWidth}
-              height={230}
-              yAxisLabel=""
-              yAxisSuffix=" L"
-              fromZero
-              showValuesOnTopOfBars
-              withInnerLines={false}
-              chartConfig={chartConfig}
-              style={styles.chart}
-            />
-          ) : (
-            <EmptyGraph text="Agrega registros para ver litros por carga." />
-          )}
-        </ChartCard>
+            <ChartCard title="Litros mensuales" icon="water">
+              {monthlyLitersChart.labels.length > 0 ? (
+                <BarChart
+                  data={monthlyLitersChart}
+                  width={chartWidth}
+                  height={230}
+                  yAxisLabel=""
+                  yAxisSuffix=" L"
+                  fromZero
+                  showValuesOnTopOfBars
+                  withInnerLines={false}
+                  chartConfig={chartConfig}
+                  style={styles.chart}
+                />
+              ) : (
+                <EmptyGraph text="Agrega registros para ver litros mensuales." />
+              )}
+            </ChartCard>
 
-        <ChartCard title="Gasto mensual" icon="calendar-range">
-          {hasRecords ? (
-            <LineChart
-              data={monthlyChartData}
-              width={chartWidth}
-              height={230}
-              yAxisLabel="$"
-              yAxisSuffix=""
-              fromZero
-              bezier
-              withShadow={false}
-              chartConfig={chartConfig}
-              style={styles.chart}
-            />
-          ) : (
-            <EmptyGraph text="Agrega registros para ver gasto mensual." />
-          )}
-        </ChartCard>
+            <ChartCard title="Rendimiento km/L" icon="trend">
+              {efficiencyChart.labels.length > 0 ? (
+                <LineChart
+                  data={efficiencyChart}
+                  width={chartWidth}
+                  height={230}
+                  fromZero
+                  bezier
+                  withShadow={false}
+                  chartConfig={chartConfig}
+                  style={styles.chart}
+                />
+              ) : (
+                <EmptyGraph text="Necesitas odometro en al menos 2 cargas." />
+              )}
+            </ChartCard>
+
+            <ChartCard title="Costo por km" icon="fuel">
+              {costPerKmChart.labels.length > 0 ? (
+                <LineChart
+                  data={costPerKmChart}
+                  width={chartWidth}
+                  height={230}
+                  yAxisLabel="$"
+                  yAxisSuffix=""
+                  fromZero
+                  bezier
+                  withShadow={false}
+                  chartConfig={chartConfig}
+                  style={styles.chart}
+                />
+              ) : (
+                <EmptyGraph text="Necesitas odometro en al menos 2 cargas." />
+              )}
+            </ChartCard>
+
+            <View style={styles.sectionHeader}>
+              <ReceiptText size={20} color="#7bf1ad" />
+              <Text style={styles.sectionTitle}>Ultimas cargas</Text>
+            </View>
+
+            {records.length > 0 ? (
+              records.slice(0, 4).map((record) => (
+                <View key={record.id} style={styles.recordRow}>
+                  <View>
+                    <Text style={styles.recordDate}>
+                      {formatDisplayDate(record.fill_date)}
+                    </Text>
+                    <Text style={styles.recordMeta}>
+                      {record.vehicle_name || "Sin vehiculo"}
+                    </Text>
+                  </View>
+
+                  <View style={styles.recordAmounts}>
+                    <Text style={styles.recordTotal}>
+                      {formatMoney(record.total_cost)}
+                    </Text>
+                    <Text style={styles.recordMeta}>
+                      {formatNumber(record.liters, 1)} L
+                    </Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <EmptyGraph text="Aun no hay cargas registradas." />
+            )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -260,6 +361,65 @@ function EmptyGraph({ text }: { text: string }) {
   );
 }
 
+function ErrorBanner({ text }: { text: string }) {
+  return (
+    <View style={styles.errorBanner}>
+      <Info size={18} color="#ffb3bd" />
+      <Text style={styles.errorText}>{text}</Text>
+    </View>
+  );
+}
+
+function buildMonthlyChart(
+  monthly: StatsResponse["monthly"],
+  key: "spent" | "liters",
+) {
+  const entries = monthly.slice(-6);
+
+  return {
+    labels: entries.map((item) => item.month.replace("-", "/")),
+    datasets: [
+      {
+        data: entries.map((item) => Number(item[key].toFixed(2))),
+      },
+    ],
+  };
+}
+
+function buildEfficiencyChart(
+  efficiency: StatsResponse["efficiency"],
+  key: "km_per_liter" | "cost_per_km",
+) {
+  const entries = efficiency.slice(-6);
+
+  return {
+    labels: entries.map((item) => shortDate(item.to_date)),
+    datasets: [
+      {
+        data: entries.map((item) => Number(item[key].toFixed(2))),
+      },
+    ],
+  };
+}
+
+function sortRecordsDesc(records: GasRecord[]) {
+  return [...records].sort(
+    (a, b) =>
+      new Date(b.fill_date).getTime() - new Date(a.fill_date).getTime(),
+  );
+}
+
+function formatMoney(value: number) {
+  return `$${formatNumber(value, 2)}`;
+}
+
+function formatNumber(value: number, decimals: number) {
+  return value.toLocaleString("es-MX", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
 const chartConfig = {
   backgroundGradientFrom: "#102330",
   backgroundGradientTo: "#102330",
@@ -302,6 +462,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  heroCopy: {
+    flex: 1,
+    paddingRight: 12,
+  },
   kicker: {
     color: "#7bf1ad",
     fontSize: 14,
@@ -325,6 +489,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  loadingCard: {
+    minHeight: 180,
+    backgroundColor: "#102330",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#18384b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    color: "#a9c7d4",
+    fontWeight: "800",
+    marginTop: 12,
+  },
+  errorBanner: {
+    backgroundColor: "#321720",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#66303e",
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  errorText: {
+    color: "#ffd9de",
+    flex: 1,
+    fontWeight: "700",
+  },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -333,6 +527,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: "48%",
+    minHeight: 128,
     backgroundColor: "#133042",
     borderRadius: 24,
     padding: 14,
@@ -354,7 +549,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     color: "#ffffff",
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: "900",
     marginTop: 6,
   },
@@ -397,5 +592,46 @@ const styles = StyleSheet.create({
     color: "#b8d1dd",
     marginTop: 8,
     textAlign: "center",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "900",
+    marginLeft: 8,
+  },
+  recordRow: {
+    backgroundColor: "#102330",
+    borderRadius: 22,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#18384b",
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  recordDate: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  recordMeta: {
+    color: "#a4c5d3",
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  recordAmounts: {
+    alignItems: "flex-end",
+  },
+  recordTotal: {
+    color: "#7bf1ad",
+    fontSize: 16,
+    fontWeight: "900",
   },
 });

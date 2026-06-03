@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import {
   CalendarDays,
   CheckCheck,
@@ -9,40 +9,77 @@ import {
   Save,
   X,
 } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ElementType } from "react";
 import {
-    Alert,
-    Animated,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
-import { formatDisplayDate, getToday } from "../../lib/fuelStats";
 
-import { addFuelRecord } from "@/lib/fuelSore";
-import { FuelRecord } from "../../types/fuel";
+import { useAuth } from "@/contexts/AuthContext";
+import { createGasRecord, getVehicles } from "@/lib/api";
+import { formatDisplayDate, getToday } from "@/lib/fuelStats";
+import type { GasRecord, Vehicle } from "@/types/fuel";
 
 const TOAST_DURATION_MS = 3600;
 const shouldUseNativeDriver = Platform.OS !== "web";
 
 export default function RegistroScreen() {
+  const { token } = useAuth();
   const [date, setDate] = useState(getToday());
   const [odometerKm, setOdometerKm] = useState("");
   const [liters, setLiters] = useState("");
-  const [totalPaid, setTotalPaid] = useState("");
+  const [pricePerLiter, setPricePerLiter] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isFullTank, setIsFullTank] = useState(true);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(
+    null,
+  );
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   const [calendarVisible, setCalendarVisible] = useState(false);
-  const [savedToast, setSavedToast] = useState<FuelRecord | null>(null);
+  const [savedToast, setSavedToast] = useState<GasRecord | null>(null);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTranslateY = useRef(new Animated.Value(-18)).current;
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const selectedVehicle = useMemo(
+    () => vehicles.find((vehicle) => vehicle.id === selectedVehicleId) || null,
+    [selectedVehicleId, vehicles],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      async function loadVehicles() {
+        if (!token) return;
+
+        try {
+          const data = await getVehicles(token);
+          setVehicles(data.vehicles || []);
+        } catch (error) {
+          Alert.alert(
+            "No se cargaron vehiculos",
+            error instanceof Error ? error.message : "Intentalo de nuevo.",
+          );
+        }
+      }
+
+      loadVehicles();
+    }, [token]),
+  );
 
   useEffect(() => {
     return () => {
@@ -52,7 +89,7 @@ export default function RegistroScreen() {
     };
   }, []);
 
-  function showSuccessToast(record: FuelRecord) {
+  function showSuccessToast(record: GasRecord) {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current);
     }
@@ -103,41 +140,56 @@ export default function RegistroScreen() {
   }
 
   async function saveRecord() {
-    const parsedKm = parseFloat(odometerKm);
-    const parsedLiters = parseFloat(liters);
-    const parsedPaid = parseFloat(totalPaid);
+    if (!token) return;
+
+    const parsedKm = odometerKm.trim()
+      ? parseInputNumber(odometerKm)
+      : null;
+    const parsedLiters = parseInputNumber(liters);
+    const parsedPrice = parseInputNumber(pricePerLiter);
 
     if (
       !date ||
-      Number.isNaN(parsedKm) ||
       Number.isNaN(parsedLiters) ||
-      Number.isNaN(parsedPaid) ||
-      parsedKm <= 0 ||
+      Number.isNaN(parsedPrice) ||
       parsedLiters <= 0 ||
-      parsedPaid <= 0
+      parsedPrice <= 0 ||
+      (parsedKm !== null && (Number.isNaN(parsedKm) || parsedKm <= 0))
     ) {
       Alert.alert(
         "Faltan datos",
-        "Llena correctamente fecha, kilometraje, litros y total pagado.",
+        "Llena fecha, litros y precio por litro. El odometro es opcional.",
       );
       return;
     }
 
-    const newRecord: FuelRecord = {
-      id: Date.now().toString(),
-      date,
-      odometerKm: parsedKm,
-      liters: parsedLiters,
-      totalPaid: parsedPaid,
-    };
+    try {
+      setIsSaving(true);
+      const response = await createGasRecord(token, {
+        vehicle_id: selectedVehicleId,
+        fill_date: date,
+        odometer_km: parsedKm,
+        liters: parsedLiters,
+        price_per_liter: parsedPrice,
+        is_full_tank: isFullTank,
+        notes: notes.trim() || null,
+      });
 
-    await addFuelRecord(newRecord);
-
-    setDate(getToday());
-    setOdometerKm("");
-    setLiters("");
-    setTotalPaid("");
-    showSuccessToast(newRecord);
+      setDate(getToday());
+      setOdometerKm("");
+      setLiters("");
+      setPricePerLiter("");
+      setNotes("");
+      setIsFullTank(true);
+      showSuccessToast(response.record);
+    } catch (error) {
+      Alert.alert(
+        "No se guardo",
+        error instanceof Error ? error.message : "Intentalo de nuevo.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -160,8 +212,10 @@ export default function RegistroScreen() {
             <View style={styles.toastBody}>
               <Text style={styles.toastTitle}>Carga guardada</Text>
               <Text style={styles.toastSubtitle}>
-                {formatDisplayDate(savedToast.date)} ·{" "}
-                {savedToast.odometerKm.toLocaleString("es-MX")} km
+                {formatDisplayDate(savedToast.fill_date)}
+                {savedToast.odometer_km
+                  ? ` - ${savedToast.odometer_km.toLocaleString("es-MX")} km`
+                  : ""}
               </Text>
 
               <View style={styles.toastPills}>
@@ -171,12 +225,14 @@ export default function RegistroScreen() {
                 />
                 <ToastPill
                   icon={ReceiptText}
-                  text={`$${savedToast.totalPaid.toFixed(2)}`}
+                  text={`$${savedToast.total_cost.toFixed(2)}`}
                 />
-                <ToastPill
-                  icon={Gauge}
-                  text={`${savedToast.odometerKm.toLocaleString("es-MX")} km`}
-                />
+                {savedToast.odometer_km ? (
+                  <ToastPill
+                    icon={Gauge}
+                    text={`${savedToast.odometer_km.toLocaleString("es-MX")} km`}
+                  />
+                ) : null}
               </View>
 
               <Pressable
@@ -200,7 +256,7 @@ export default function RegistroScreen() {
       ) : null}
 
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
@@ -214,11 +270,59 @@ export default function RegistroScreen() {
             <Text style={styles.kicker}>Nueva carga</Text>
             <Text style={styles.title}>Registro</Text>
             <Text style={styles.subtitle}>
-              Guarda cada carga para calcular rendimiento y próximas visitas.
+              Guarda litros, precio y odometro en la API.
             </Text>
           </View>
 
           <View style={styles.card}>
+            <Text style={styles.label}>Vehiculo</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.vehicleOptions}
+            >
+              <Pressable
+                onPress={() => setSelectedVehicleId(null)}
+                style={[
+                  styles.vehicleChip,
+                  !selectedVehicleId && styles.vehicleChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.vehicleChipText,
+                    !selectedVehicleId && styles.vehicleChipTextActive,
+                  ]}
+                >
+                  Sin vehiculo
+                </Text>
+              </Pressable>
+
+              {vehicles.map((vehicle) => {
+                const isActive = vehicle.id === selectedVehicleId;
+
+                return (
+                  <Pressable
+                    key={vehicle.id}
+                    onPress={() => setSelectedVehicleId(vehicle.id)}
+                    style={[
+                      styles.vehicleChip,
+                      isActive && styles.vehicleChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.vehicleChipText,
+                        isActive && styles.vehicleChipTextActive,
+                      ]}
+                    >
+                      {vehicle.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
             <Text style={styles.label}>Fecha</Text>
             <Pressable
               style={styles.dateButton}
@@ -233,7 +337,7 @@ export default function RegistroScreen() {
               <ChevronDown size={18} color="#9fc0cf" />
             </Pressable>
 
-            <Text style={styles.label}>Kilometraje actual</Text>
+            <Text style={styles.label}>Odometro en km</Text>
             <TextInput
               style={styles.input}
               value={odometerKm}
@@ -250,22 +354,65 @@ export default function RegistroScreen() {
               onChangeText={setLiters}
               placeholder="Ej. 38"
               placeholderTextColor="#7f97a3"
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
             />
 
-            <Text style={styles.label}>Total pagado</Text>
+            <Text style={styles.label}>Precio por litro</Text>
             <TextInput
               style={styles.input}
-              value={totalPaid}
-              onChangeText={setTotalPaid}
-              placeholder="Ej. 910"
+              value={pricePerLiter}
+              onChangeText={setPricePerLiter}
+              placeholder="Ej. 24.50"
               placeholderTextColor="#7f97a3"
-              keyboardType="numeric"
+              keyboardType="decimal-pad"
             />
 
-            <Pressable style={styles.button} onPress={saveRecord}>
-              <Save size={19} color="#06110b" />
-              <Text style={styles.buttonText}>Guardar carga</Text>
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.switchTitle}>Tanque lleno</Text>
+                <Text style={styles.switchMeta}>
+                  {isFullTank ? "Si" : "No"}
+                </Text>
+              </View>
+              <Switch
+                value={isFullTank}
+                onValueChange={setIsFullTank}
+                thumbColor={isFullTank ? "#7bf1ad" : "#8fa9b5"}
+                trackColor={{ false: "#213746", true: "#1c6b42" }}
+              />
+            </View>
+
+            <Text style={styles.label}>Notas</Text>
+            <TextInput
+              style={[styles.input, styles.notesInput]}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder={
+                selectedVehicle
+                  ? `Ej. Carga de ${selectedVehicle.name}`
+                  : "Ej. Carga inicial"
+              }
+              placeholderTextColor="#7f97a3"
+              multiline
+              textAlignVertical="top"
+            />
+
+            <Pressable
+              disabled={isSaving}
+              style={({ pressed }) => [
+                styles.button,
+                (pressed || isSaving) && styles.buttonPressed,
+              ]}
+              onPress={saveRecord}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#06110b" />
+              ) : (
+                <>
+                  <Save size={19} color="#06110b" />
+                  <Text style={styles.buttonText}>Guardar carga</Text>
+                </>
+              )}
             </Pressable>
           </View>
         </ScrollView>
@@ -322,7 +469,7 @@ function ToastPill({
   icon: Icon,
   text,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   text: string;
 }) {
   return (
@@ -333,7 +480,14 @@ function ToastPill({
   );
 }
 
+function parseInputNumber(value: string) {
+  return Number(value.replace(",", "."));
+}
+
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   safe: {
     flex: 1,
     backgroundColor: "#08131b",
@@ -468,6 +622,29 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: "700",
   },
+  vehicleOptions: {
+    gap: 8,
+    paddingBottom: 14,
+  },
+  vehicleChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#1f3a49",
+    backgroundColor: "#0b1821",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  vehicleChipActive: {
+    backgroundColor: "#16d26b",
+    borderColor: "#16d26b",
+  },
+  vehicleChipText: {
+    color: "#d7edf6",
+    fontWeight: "800",
+  },
+  vehicleChipTextActive: {
+    color: "#06110b",
+  },
   input: {
     backgroundColor: "#0b1821",
     borderRadius: 17,
@@ -478,6 +655,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1f3a49",
     marginBottom: 14,
+  },
+  notesInput: {
+    minHeight: 94,
   },
   dateButton: {
     backgroundColor: "#0b1821",
@@ -501,14 +681,39 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontWeight: "700",
   },
+  switchRow: {
+    backgroundColor: "#0b1821",
+    borderRadius: 17,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#1f3a49",
+    marginBottom: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  switchTitle: {
+    color: "#f4fbff",
+    fontWeight: "900",
+  },
+  switchMeta: {
+    color: "#9fc0cf",
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "700",
+  },
   button: {
+    minHeight: 54,
     backgroundColor: "#16d26b",
     borderRadius: 18,
-    paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     marginTop: 4,
+  },
+  buttonPressed: {
+    opacity: 0.78,
   },
   buttonText: {
     color: "#06110b",

@@ -5,13 +5,15 @@ const STORAGE_KEY = "@appGas:fuelRecords";
 
 export function sortRecordsDesc(records: FuelRecord[]) {
   return [...records].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    (a, b) =>
+      new Date(b.fill_date).getTime() - new Date(a.fill_date).getTime(),
   );
 }
 
 export function sortRecordsAsc(records: FuelRecord[]) {
   return [...records].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    (a, b) =>
+      new Date(a.fill_date).getTime() - new Date(b.fill_date).getTime(),
   );
 }
 

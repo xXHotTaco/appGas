@@ -1,5 +1,11 @@
 import { Tabs } from "expo-router";
-import { ChartColumn, CirclePlus, ReceiptText } from "lucide-react-native";
+import {
+  Car,
+  ChartColumn,
+  CirclePlus,
+  CircleUser,
+  ReceiptText,
+} from "lucide-react-native";
 
 export default function TabsLayout() {
   return (
@@ -47,6 +53,24 @@ export default function TabsLayout() {
           title: "Historial",
           tabBarIcon: ({ color, size }) => (
             <ReceiptText color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="vehiculos"
+        options={{
+          title: "Vehiculos",
+          tabBarIcon: ({ color, size }) => <Car color={color} size={size} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="perfil"
+        options={{
+          title: "Perfil",
+          tabBarIcon: ({ color, size }) => (
+            <CircleUser color={color} size={size} />
           ),
         }}
       />
