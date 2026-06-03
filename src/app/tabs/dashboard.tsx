@@ -26,6 +26,7 @@ import {
 import { BarChart, LineChart } from "react-native-chart-kit";
 
 import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
+import { BrandMark } from "@/components/brand-mark";
 import { useAuth } from "@/contexts/AuthContext";
 import { getGasRecords, getStats } from "@/lib/api";
 import { formatDisplayDate, shortDate } from "@/lib/fuelStats";
@@ -140,7 +141,7 @@ export default function DashboardScreen() {
       >
         <View style={styles.hero}>
           <View style={styles.heroCopy}>
-            <Text style={styles.kicker}>appGas</Text>
+            <BrandMark />
             <Text style={styles.title}>Dashboard</Text>
             <Text style={styles.subtitle}>Resumen real de tus cargas.</Text>
           </View>
@@ -472,12 +473,6 @@ const styles = StyleSheet.create({
   heroCopy: {
     flex: 1,
     paddingRight: 12,
-  },
-  kicker: {
-    color: "#7bf1ad",
-    fontSize: 14,
-    fontWeight: "900",
-    marginBottom: 4,
   },
   title: {
     color: "#ffffff",

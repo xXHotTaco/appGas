@@ -22,6 +22,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { AUTH_CONTENT_MAX_WIDTH } from "@/constants/layout";
+import { BrandMark } from "@/components/brand-mark";
 
 export default function RegisterScreen() {
   const { register } = useAuth();
@@ -100,7 +101,7 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.hero}>
-            <Text style={styles.kicker}>appGas</Text>
+            <BrandMark />
             <Text style={styles.title}>Crear cuenta</Text>
             <Text style={styles.subtitle}>Tu historial queda protegido.</Text>
           </View>
@@ -293,12 +294,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#18384b",
-  },
-  kicker: {
-    color: "#7bf1ad",
-    fontSize: 14,
-    fontWeight: "900",
-    marginBottom: 4,
   },
   title: {
     color: "#ffffff",

@@ -16,6 +16,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { AUTH_CONTENT_MAX_WIDTH } from "@/constants/layout";
+import { BrandMark } from "@/components/brand-mark";
 import { ApiError } from "@/lib/api";
 
 type LoginToast = {
@@ -97,7 +98,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.hero}>
-            <Text style={styles.kicker}>appGas</Text>
+            <BrandMark />
             <Text style={styles.title}>Iniciar sesion</Text>
           </View>
 
@@ -215,12 +216,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#18384b",
-  },
-  kicker: {
-    color: "#7bf1ad",
-    fontSize: 14,
-    fontWeight: "900",
-    marginBottom: 4,
   },
   title: {
     color: "#ffffff",
