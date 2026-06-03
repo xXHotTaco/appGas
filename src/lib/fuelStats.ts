@@ -10,12 +10,12 @@ export function calculateStats(records: FuelRecord[]) {
 
   const monthlySpent = sorted
     .filter((record) => {
-      const d = new Date(`${record.date}T00:00:00`);
+      const d = new Date(`${record.fill_date}T00:00:00`);
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     })
-    .reduce((sum, record) => sum + record.totalPaid, 0);
+    .reduce((sum, record) => sum + record.total_cost, 0);
 
-  const totalSpent = sorted.reduce((sum, record) => sum + record.totalPaid, 0);
+  const totalSpent = sorted.reduce((sum, record) => sum + record.total_cost, 0);
   const totalLiters = sorted.reduce((sum, record) => sum + record.liters, 0);
 
   let totalKm = 0;
@@ -26,8 +26,10 @@ export function calculateStats(records: FuelRecord[]) {
   for (let i = 1; i < sorted.length; i++) {
     const previous = sorted[i - 1];
     const current = sorted[i];
+    const previousKm = previous.odometer_km ?? 0;
+    const currentKm = current.odometer_km ?? 0;
 
-    const kmDiff = current.odometerKm - previous.odometerKm;
+    const kmDiff = currentKm - previousKm;
 
     if (kmDiff > 0 && current.liters > 0) {
       totalKm += kmDiff;
@@ -35,8 +37,8 @@ export function calculateStats(records: FuelRecord[]) {
     }
 
     const daysDiff =
-      (new Date(`${current.date}T00:00:00`).getTime() -
-        new Date(`${previous.date}T00:00:00`).getTime()) /
+      (new Date(`${current.fill_date}T00:00:00`).getTime() -
+        new Date(`${previous.fill_date}T00:00:00`).getTime()) /
       (1000 * 60 * 60 * 24);
 
     if (daysDiff > 0) {
@@ -54,7 +56,9 @@ export function calculateStats(records: FuelRecord[]) {
   let nextFillDate = "";
 
   if (sorted.length > 0 && averageDaysBetweenFills > 0) {
-    const lastDate = new Date(`${sorted[sorted.length - 1].date}T00:00:00`);
+    const lastDate = new Date(
+      `${sorted[sorted.length - 1].fill_date}T00:00:00`,
+    );
     lastDate.setDate(lastDate.getDate() + Math.round(averageDaysBetweenFills));
     nextFillDate = toISODate(lastDate);
   }
@@ -74,10 +78,10 @@ export function getSpendingChartData(records: FuelRecord[]) {
   const sorted = sortRecordsAsc(records).slice(-6);
 
   return {
-    labels: sorted.map((r) => shortDate(r.date)),
+    labels: sorted.map((r) => shortDate(r.fill_date)),
     datasets: [
       {
-        data: sorted.map((r) => Number(r.totalPaid.toFixed(2))),
+        data: sorted.map((r) => Number(r.total_cost.toFixed(2))),
       },
     ],
   };
@@ -87,7 +91,7 @@ export function getLitersChartData(records: FuelRecord[]) {
   const sorted = sortRecordsAsc(records).slice(-6);
 
   return {
-    labels: sorted.map((r) => shortDate(r.date)),
+    labels: sorted.map((r) => shortDate(r.fill_date)),
     datasets: [
       {
         data: sorted.map((r) => Number(r.liters.toFixed(1))),
@@ -104,12 +108,14 @@ export function getEfficiencyChartData(records: FuelRecord[]) {
   for (let i = 1; i < sorted.length; i++) {
     const previous = sorted[i - 1];
     const current = sorted[i];
+    const previousKm = previous.odometer_km ?? 0;
+    const currentKm = current.odometer_km ?? 0;
 
-    const kmDiff = current.odometerKm - previous.odometerKm;
+    const kmDiff = currentKm - previousKm;
 
     if (kmDiff > 0 && current.liters > 0) {
       points.push({
-        label: shortDate(current.date),
+        label: shortDate(current.fill_date),
         value: Number((kmDiff / current.liters).toFixed(2)),
       });
     }
@@ -131,9 +137,9 @@ export function getMonthlySpendingChartData(records: FuelRecord[]) {
   const monthlyMap = new Map<string, number>();
 
   sortRecordsAsc(records).forEach((record) => {
-    const d = new Date(`${record.date}T00:00:00`);
+    const d = new Date(`${record.fill_date}T00:00:00`);
     const key = `${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}`;
-    monthlyMap.set(key, (monthlyMap.get(key) || 0) + record.totalPaid);
+    monthlyMap.set(key, (monthlyMap.get(key) || 0) + record.total_cost);
   });
 
   const entries = Array.from(monthlyMap.entries()).slice(-6);
