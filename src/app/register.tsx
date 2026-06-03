@@ -1,9 +1,14 @@
 import { Link } from "expo-router";
-import { Eye, EyeOff, UserPlus } from "lucide-react-native";
-import { useState } from "react";
+import {
+  CheckCircle,
+  CircleAlert,
+  Eye,
+  EyeOff,
+  UserPlus,
+} from "lucide-react-native";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -24,16 +29,50 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const cleanName = name.trim();
+  const cleanEmail = email.trim().toLowerCase();
+  const passwordChecks = useMemo(
+    () => ({
+      length: password.length >= 8,
+      upper: /[A-Z]/.test(password),
+      lower: /[a-z]/.test(password),
+      number: /\d/.test(password),
+    }),
+    [password],
+  );
+  const isPasswordStrong = Object.values(passwordChecks).every(Boolean);
+  const nameError =
+    cleanName.length === 0
+      ? "Escribe tu nombre."
+      : cleanName.length < 3
+        ? "El nombre debe tener al menos 3 caracteres."
+        : /\d/.test(cleanName)
+          ? "El nombre no debe contener numeros."
+          : "";
+  const emailError =
+    cleanEmail.length === 0
+      ? "Escribe tu correo."
+      : !isValidEmail(cleanEmail)
+        ? "Escribe un correo valido, por ejemplo hola@test.com."
+        : "";
+  const passwordError =
+    password.length === 0
+      ? "Escribe una contrasena."
+      : !isPasswordStrong
+        ? "La contrasena necesita cumplir los requisitos."
+        : "";
+  const shouldShowNameError = hasSubmitted || name.length > 0;
+  const shouldShowEmailError = hasSubmitted || email.length > 0;
+  const shouldShowPasswordError = hasSubmitted || password.length > 0;
 
   async function handleRegister() {
-    const cleanName = name.trim();
-    const cleanEmail = email.trim().toLowerCase();
+    setHasSubmitted(true);
+    setFormError("");
 
-    if (!cleanName || !cleanEmail || password.length < 6) {
-      Alert.alert(
-        "Revisa tus datos",
-        "Nombre, correo y contrasena de al menos 6 caracteres.",
-      );
+    if (nameError || emailError || passwordError) {
       return;
     }
 
@@ -41,8 +80,7 @@ export default function RegisterScreen() {
       setIsSubmitting(true);
       await register(cleanName, cleanEmail, password);
     } catch (error) {
-      Alert.alert(
-        "No se pudo registrar",
+      setFormError(
         error instanceof Error ? error.message : "Intentalo de nuevo.",
       );
     } finally {
@@ -67,16 +105,29 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.card}>
+            {formError ? (
+              <View style={styles.errorBanner}>
+                <CircleAlert size={18} color="#ffcf7a" />
+                <Text style={styles.errorBannerText}>{formError}</Text>
+              </View>
+            ) : null}
+
             <Text style={styles.label}>Nombre</Text>
             <TextInput
               autoCapitalize="words"
               autoComplete="name"
               onChangeText={setName}
-              placeholder="Carlos Gutierrez"
+              placeholder="Juan Perez"
               placeholderTextColor="#7f97a3"
-              style={styles.input}
+              style={[
+                styles.input,
+                shouldShowNameError && nameError ? styles.inputError : null,
+              ]}
               value={name}
             />
+            {shouldShowNameError && nameError ? (
+              <Text style={styles.fieldError}>{nameError}</Text>
+            ) : null}
 
             <Text style={styles.label}>Correo</Text>
             <TextInput
@@ -86,12 +137,25 @@ export default function RegisterScreen() {
               onChangeText={setEmail}
               placeholder="hola@test.com"
               placeholderTextColor="#7f97a3"
-              style={styles.input}
+              style={[
+                styles.input,
+                shouldShowEmailError && emailError ? styles.inputError : null,
+              ]}
               value={email}
             />
+            {shouldShowEmailError && emailError ? (
+              <Text style={styles.fieldError}>{emailError}</Text>
+            ) : null}
 
-            <Text style={styles.label}>Contrasena</Text>
-            <View style={styles.passwordRow}>
+            <Text style={styles.label}>Contraseña</Text>
+            <View
+              style={[
+                styles.passwordRow,
+                shouldShowPasswordError && passwordError
+                  ? styles.inputError
+                  : null,
+              ]}
+            >
               <TextInput
                 autoCapitalize="none"
                 autoComplete="password"
@@ -105,8 +169,8 @@ export default function RegisterScreen() {
               <Pressable
                 accessibilityLabel={
                   isPasswordVisible
-                    ? "Ocultar contrasena"
-                    : "Mostrar contrasena"
+                    ? "Ocultar contraseña"
+                    : "Mostrar contraseña"
                 }
                 accessibilityRole="button"
                 onPress={() => setIsPasswordVisible((current) => !current)}
@@ -121,6 +185,25 @@ export default function RegisterScreen() {
                   <Eye size={21} color="#a9c7d4" />
                 )}
               </Pressable>
+            </View>
+            {shouldShowPasswordError && passwordError ? (
+              <Text style={styles.fieldError}>{passwordError}</Text>
+            ) : null}
+
+            <View style={styles.passwordChecklist}>
+              <PasswordRule
+                isValid={passwordChecks.length}
+                text="Minimo 8 caracteres"
+              />
+              <PasswordRule
+                isValid={passwordChecks.upper}
+                text="Una mayuscula"
+              />
+              <PasswordRule
+                isValid={passwordChecks.lower}
+                text="Una minuscula"
+              />
+              <PasswordRule isValid={passwordChecks.number} text="Un numero" />
             </View>
 
             <Pressable
@@ -154,6 +237,36 @@ export default function RegisterScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function PasswordRule({
+  isValid,
+  text,
+}: {
+  isValid: boolean;
+  text: string;
+}) {
+  return (
+    <View style={styles.passwordRule}>
+      {isValid ? (
+        <CheckCircle size={15} color="#7bf1ad" />
+      ) : (
+        <CircleAlert size={15} color="#7f97a3" />
+      )}
+      <Text
+        style={[
+          styles.passwordRuleText,
+          isValid && styles.passwordRuleTextValid,
+        ]}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 }
 
 const styles = StyleSheet.create({
@@ -199,6 +312,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#18384b",
   },
+  errorBanner: {
+    backgroundColor: "#2b2114",
+    borderColor: "#a8651b",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+    padding: 12,
+  },
+  errorBannerText: {
+    color: "#ffd99a",
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800",
+  },
   label: {
     color: "#a6c5d3",
     fontSize: 13,
@@ -215,6 +345,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1f3a49",
     marginBottom: 14,
+  },
+  inputError: {
+    borderColor: "#ff7c87",
+  },
+  fieldError: {
+    color: "#ff9aa5",
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+    marginTop: -8,
+    marginBottom: 12,
   },
   passwordRow: {
     flexDirection: "row",
@@ -239,6 +380,29 @@ const styles = StyleSheet.create({
   },
   eyeButtonPressed: {
     opacity: 0.7,
+  },
+  passwordChecklist: {
+    backgroundColor: "#0b1821",
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#1f3a49",
+    gap: 8,
+    marginBottom: 14,
+    marginTop: -2,
+    padding: 12,
+  },
+  passwordRule: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  passwordRuleText: {
+    color: "#8fa9b5",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  passwordRuleTextValid: {
+    color: "#bdfbd4",
   },
   button: {
     minHeight: 54,

@@ -44,7 +44,7 @@ export default function PerfilScreen() {
     try {
       setIsLoggingOut(true);
       await logout();
-      router.replace("/login");
+      router.replace("/");
     } catch (error) {
       Alert.alert(
         "No se pudo cerrar sesion",
@@ -52,17 +52,6 @@ export default function PerfilScreen() {
       );
       setIsLoggingOut(false);
     }
-  }
-
-  function confirmLogout() {
-    Alert.alert("Cerrar sesion", "Quieres salir de appGas?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Salir",
-        style: "destructive",
-        onPress: handleLogout,
-      },
-    ]);
   }
 
   return (
@@ -113,7 +102,7 @@ export default function PerfilScreen() {
 
         <Pressable
           disabled={isLoggingOut}
-          onPress={confirmLogout}
+          onPress={handleLogout}
           style={({ pressed }) => [
             styles.logoutButton,
             (pressed || isLoggingOut) && styles.buttonPressed,

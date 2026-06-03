@@ -1,9 +1,8 @@
 import { Link } from "expo-router";
-import { Eye, EyeOff, LogIn } from "lucide-react-native";
-import { useState } from "react";
+import { CircleAlert, Eye, EyeOff, LogIn } from "lucide-react-native";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,6 +15,12 @@ import {
 } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { ApiError } from "@/lib/api";
+
+type LoginToast = {
+  title: string;
+  message: string;
+};
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -23,23 +28,58 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<LoginToast | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) {
+        clearTimeout(toastTimer.current);
+      }
+    };
+  }, []);
+
+  function showToast(nextToast: LoginToast) {
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+    }
+
+    setToast(nextToast);
+    toastTimer.current = setTimeout(() => {
+      setToast(null);
+      toastTimer.current = null;
+    }, 4500);
+  }
 
   async function handleLogin() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail || !password) {
-      Alert.alert("Faltan datos", "Escribe tu correo y contrasena.");
+      showToast({
+        title: "Faltan datos",
+        message: "Escribe tu correo y contraseña.",
+      });
       return;
     }
 
     try {
       setIsSubmitting(true);
+      setToast(null);
       await login(cleanEmail, password);
     } catch (error) {
-      Alert.alert(
-        "No se pudo iniciar sesion",
-        error instanceof Error ? error.message : "Intentalo de nuevo.",
-      );
+      if (error instanceof ApiError && [401, 403].includes(error.status)) {
+        showToast({
+          title: "Credenciales incorrectas",
+          message: "El correo o la contraseña son incorrectos.",
+        });
+        return;
+      }
+
+      showToast({
+        title: "No se pudo iniciar sesion",
+        message:
+          error instanceof Error ? error.message : "Intentalo de nuevo.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -58,10 +98,21 @@ export default function LoginScreen() {
           <View style={styles.hero}>
             <Text style={styles.kicker}>appGas</Text>
             <Text style={styles.title}>Iniciar sesion</Text>
-            <Text style={styles.subtitle}>Conecta tus cargas con la API.</Text>
           </View>
 
           <View style={styles.card}>
+            {toast ? (
+              <View style={styles.toast}>
+                <View style={styles.toastIcon}>
+                  <CircleAlert size={20} color="#ffcf7a" />
+                </View>
+                <View style={styles.toastBody}>
+                  <Text style={styles.toastTitle}>{toast.title}</Text>
+                  <Text style={styles.toastMessage}>{toast.message}</Text>
+                </View>
+              </View>
+            ) : null}
+
             <Text style={styles.label}>Correo</Text>
             <TextInput
               autoCapitalize="none"
@@ -74,7 +125,7 @@ export default function LoginScreen() {
               value={email}
             />
 
-            <Text style={styles.label}>Contrasena</Text>
+            <Text style={styles.label}>Contraseña</Text>
             <View style={styles.passwordRow}>
               <TextInput
                 autoCapitalize="none"
@@ -89,8 +140,8 @@ export default function LoginScreen() {
               <Pressable
                 accessibilityLabel={
                   isPasswordVisible
-                    ? "Ocultar contrasena"
-                    : "Mostrar contrasena"
+                    ? "Ocultar contraseña"
+                    : "Mostrar contraseña"
                 }
                 accessibilityRole="button"
                 onPress={() => setIsPasswordVisible((current) => !current)}
@@ -182,6 +233,38 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#18384b",
+  },
+  toast: {
+    backgroundColor: "#2b2114",
+    borderColor: "#a8651b",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    marginBottom: 14,
+    padding: 12,
+  },
+  toastIcon: {
+    alignItems: "center",
+    backgroundColor: "#3b2b14",
+    borderRadius: 14,
+    height: 36,
+    justifyContent: "center",
+    marginRight: 10,
+    width: 36,
+  },
+  toastBody: {
+    flex: 1,
+  },
+  toastTitle: {
+    color: "#fff4d8",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  toastMessage: {
+    color: "#ffd99a",
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 3,
   },
   label: {
     color: "#a6c5d3",
