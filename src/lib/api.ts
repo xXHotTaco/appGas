@@ -22,6 +22,16 @@ type AuthResponse = {
   user: AuthUser;
 };
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: ApiRequestOptions = {},
@@ -44,7 +54,7 @@ export async function apiRequest<T>(
   const data = (text ? JSON.parse(text) : {}) as ApiEnvelope<T>;
 
   if (!response.ok || data.ok === false) {
-    throw new Error(data.error || "Error en la peticion");
+    throw new ApiError(data.error || "Error en la peticion", response.status);
   }
 
   return data;

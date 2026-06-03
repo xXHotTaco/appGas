@@ -3,6 +3,8 @@ import {
   CalendarDays,
   CheckCheck,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Droplets,
   Gauge,
   ReceiptText,
@@ -435,6 +437,15 @@ export default function RegistroScreen() {
 
             <Calendar
               current={date}
+              renderArrow={(direction) => (
+                <View style={styles.calendarArrow}>
+                  {direction === "left" ? (
+                    <ChevronLeft size={20} color="#7bf1ad" strokeWidth={3} />
+                  ) : (
+                    <ChevronRight size={20} color="#7bf1ad" strokeWidth={3} />
+                  )}
+                </View>
+              )}
               onDayPress={(day) => {
                 setDate(day.dateString);
                 setCalendarVisible(false);
@@ -744,5 +755,15 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 18,
     fontWeight: "800",
+  },
+  calendarArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0d212d",
+    borderWidth: 1,
+    borderColor: "#1f4658",
   },
 });

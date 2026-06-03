@@ -12,7 +12,6 @@ import {
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -32,6 +31,7 @@ export default function HistorialScreen() {
   const [records, setRecords] = useState<GasRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const loadData = useCallback(async () => {
@@ -39,6 +39,7 @@ export default function HistorialScreen() {
 
     try {
       setError("");
+      setPendingDeleteId(null);
       const data = await getGasRecords(token);
       setRecords(sortRecordsDesc(data.records || []));
     } catch (loadError) {
@@ -59,34 +60,30 @@ export default function HistorialScreen() {
     }, [loadData]),
   );
 
-  function confirmDelete(id: string) {
-    Alert.alert("Eliminar registro", "Seguro que quieres eliminar esta carga?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: async () => {
-          if (!token) return;
+  async function handleDeletePress(id: string) {
+    if (!token || deletingId) return;
 
-          try {
-            setDeletingId(id);
-            await deleteGasRecord(token, id);
-            setRecords((current) =>
-              current.filter((record) => record.id !== id),
-            );
-          } catch (deleteError) {
-            Alert.alert(
-              "No se elimino",
-              deleteError instanceof Error
-                ? deleteError.message
-                : "Intentalo de nuevo.",
-            );
-          } finally {
-            setDeletingId(null);
-          }
-        },
-      },
-    ]);
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      setError("");
+      return;
+    }
+
+    try {
+      setDeletingId(id);
+      setError("");
+      await deleteGasRecord(token, id);
+      setRecords((current) => current.filter((record) => record.id !== id));
+      setPendingDeleteId(null);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "No se elimino. Intentalo de nuevo.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -107,7 +104,6 @@ export default function HistorialScreen() {
         <View style={styles.hero}>
           <Text style={styles.kicker}>Tus cargas</Text>
           <Text style={styles.title}>Historial</Text>
-          <Text style={styles.subtitle}>Lista conectada a Cloudflare D1.</Text>
         </View>
 
         {error ? (
@@ -147,9 +143,10 @@ export default function HistorialScreen() {
 
                 <Pressable
                   disabled={deletingId === item.id}
-                  onPress={() => confirmDelete(item.id)}
+                  onPress={() => handleDeletePress(item.id)}
                   style={({ pressed }) => [
                     styles.deleteButton,
+                    pendingDeleteId === item.id && styles.deleteButtonConfirm,
                     (pressed || deletingId === item.id) &&
                       styles.deleteButtonPressed,
                   ]}
@@ -159,11 +156,30 @@ export default function HistorialScreen() {
                   ) : (
                     <>
                       <Trash2 size={15} color="#ff7c87" />
-                      <Text style={styles.delete}>Eliminar</Text>
+                      <Text style={styles.delete}>
+                        {pendingDeleteId === item.id ? "Confirmar" : "Eliminar"}
+                      </Text>
                     </>
                   )}
                 </Pressable>
               </View>
+
+              {pendingDeleteId === item.id ? (
+                <View style={styles.confirmBox}>
+                  <View style={styles.confirmTextWrap}>
+                    <Info size={16} color="#ffcf7a" />
+                    <Text style={styles.confirmText}>
+                      Toca Confirmar para eliminar esta carga.
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setPendingDeleteId(null)}
+                    style={styles.cancelDeleteButton}
+                  >
+                    <Text style={styles.cancelDeleteText}>Cancelar</Text>
+                  </Pressable>
+                </View>
+              ) : null}
 
               <View style={styles.vehicleRow}>
                 <Car size={15} color="#8cecb8" />
@@ -352,10 +368,51 @@ const styles = StyleSheet.create({
   deleteButtonPressed: {
     opacity: 0.75,
   },
+  deleteButtonConfirm: {
+    backgroundColor: "#4b1720",
+    borderColor: "#ff7c87",
+  },
   delete: {
     color: "#ff7c87",
     fontWeight: "900",
     fontSize: 12,
+  },
+  confirmBox: {
+    backgroundColor: "#2b2114",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#7a4d1c",
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  confirmTextWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  confirmText: {
+    color: "#ffd99a",
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+  },
+  cancelDeleteButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#7a4d1c",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  cancelDeleteText: {
+    color: "#fff4d8",
+    fontSize: 12,
+    fontWeight: "900",
   },
   vehicleRow: {
     flexDirection: "row",
