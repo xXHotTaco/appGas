@@ -96,6 +96,14 @@ export function createVehicle(
   );
 }
 
+export function deleteVehicle(token: string, id: string) {
+  return apiRequest<{ ok: true }>(
+    `/api/vehicles/${id}`,
+    { method: "DELETE" },
+    token,
+  );
+}
+
 function withVehicleFilter(endpoint: string, vehicleId?: string | null) {
   if (!vehicleId) {
     return endpoint;

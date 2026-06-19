@@ -1,10 +1,11 @@
 import { useFocusEffect } from "expo-router";
-import { Car, CirclePlus, Fuel, Info } from "lucide-react-native";
+import { Car, CirclePlus, Fuel, Info, Trash2, X } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -17,17 +18,26 @@ import {
 } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useVehicleFilter } from "@/contexts/VehicleFilterContext";
 import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
-import { createVehicle, getVehicles } from "@/lib/api";
+import { createVehicle, deleteVehicle, getVehicles } from "@/lib/api";
 import type { Vehicle } from "@/types/fuel";
 
 export default function VehiculosScreen() {
   const { token } = useAuth();
+  const { selectedVehicleId, setSelectedVehicleId } = useVehicleFilter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [name, setName] = useState("");
   const [tankCapacity, setTankCapacity] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingVehicleId, setDeletingVehicleId] = useState<string | null>(
+    null,
+  );
+  const [vehiclePendingDelete, setVehiclePendingDelete] = useState<Vehicle | null>(
+    null,
+  );
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [error, setError] = useState("");
 
   const loadData = useCallback(async () => {
@@ -85,6 +95,66 @@ export default function VehiculosScreen() {
       );
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  function confirmDeleteVehicle(vehicle: Vehicle) {
+    setVehiclePendingDelete(vehicle);
+    setDeleteStep(1);
+  }
+
+  function closeDeleteModal() {
+    if (deletingVehicleId) return;
+
+    setVehiclePendingDelete(null);
+    setDeleteStep(1);
+  }
+
+  function continueDeleteVehicle() {
+    setDeleteStep(2);
+  }
+
+  function submitDeleteVehicle() {
+    if (!vehiclePendingDelete) return;
+
+    void removeVehicle(vehiclePendingDelete.id);
+  }
+
+  async function removeVehicle(vehicleId: string) {
+    if (!token) return;
+
+    const remainingVehicles = vehicles.filter((vehicle) => vehicle.id !== vehicleId);
+    const nextVehicleId =
+      selectedVehicleId === vehicleId
+        ? remainingVehicles[0]?.id || null
+        : selectedVehicleId;
+
+    try {
+      setDeletingVehicleId(vehicleId);
+      setError("");
+      await deleteVehicle(token, vehicleId);
+      setSelectedVehicleId(nextVehicleId);
+
+      const data = await getVehicles(token);
+      const nextVehicles = data.vehicles || [];
+      const hasCurrentSelection =
+        !!nextVehicleId &&
+        nextVehicles.some((vehicle) => vehicle.id === nextVehicleId);
+
+      if (nextVehicleId && !hasCurrentSelection) {
+        setSelectedVehicleId(nextVehicles[0]?.id || null);
+      }
+
+      setVehicles(nextVehicles);
+      setVehiclePendingDelete(null);
+      setDeleteStep(1);
+    } catch (deleteError) {
+      Alert.alert(
+        "No se borro",
+        deleteError instanceof Error ? deleteError.message : "Intentalo de nuevo.",
+      );
+    } finally {
+      setDeletingVehicleId(null);
     }
   }
 
@@ -195,10 +265,96 @@ export default function VehiculosScreen() {
                     </Text>
                   </View>
                 </View>
+
+                <Pressable
+                  disabled={deletingVehicleId === vehicle.id}
+                  onPress={() => confirmDeleteVehicle(vehicle)}
+                  style={({ pressed }) => [
+                    styles.deleteButton,
+                    (pressed || deletingVehicleId === vehicle.id) &&
+                      styles.deleteButtonPressed,
+                  ]}
+                >
+                  {deletingVehicleId === vehicle.id ? (
+                    <ActivityIndicator color="#ffd9de" size="small" />
+                  ) : (
+                    <Trash2 size={18} color="#ffd9de" />
+                  )}
+                </Pressable>
               </View>
             ))
           )}
         </ScrollView>
+
+        <Modal
+          visible={!!vehiclePendingDelete}
+          animationType="fade"
+          transparent
+          onRequestClose={closeDeleteModal}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleWrap}>
+                  <Text style={styles.modalEyebrow}>Paso {deleteStep} de 2</Text>
+                  <Text style={styles.modalTitle}>
+                    {deleteStep === 1 ? "Eliminar vehiculo" : "Confirmacion final"}
+                  </Text>
+                </View>
+
+                <Pressable
+                  disabled={!!deletingVehicleId}
+                  onPress={closeDeleteModal}
+                  style={({ pressed }) => [
+                    styles.modalCloseButton,
+                    pressed && styles.modalCloseButtonPressed,
+                  ]}
+                >
+                  <X size={18} color="#d7edf6" />
+                </Pressable>
+              </View>
+
+              <Text style={styles.modalBody}>
+                {deleteStep === 1
+                  ? `Se borrara "${vehiclePendingDelete?.name}" y esta accion tambien afectara a los registros del vehiculo eliminado.`
+                  : `Vas a eliminar "${vehiclePendingDelete?.name}". Esta accion tambien afectara a los registros del vehiculo eliminado y no se puede deshacer.`}
+              </Text>
+
+              <View style={styles.modalActions}>
+                <Pressable
+                  disabled={!!deletingVehicleId}
+                  onPress={closeDeleteModal}
+                  style={({ pressed }) => [
+                    styles.modalSecondaryButton,
+                    pressed && styles.modalSecondaryButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.modalSecondaryButtonText}>Cancelar</Text>
+                </Pressable>
+
+                <Pressable
+                  disabled={!!deletingVehicleId}
+                  onPress={
+                    deleteStep === 1 ? continueDeleteVehicle : submitDeleteVehicle
+                  }
+                  style={({ pressed }) => [
+                    styles.modalDangerButton,
+                    (pressed || deletingVehicleId === vehiclePendingDelete?.id) &&
+                      styles.modalDangerButtonPressed,
+                  ]}
+                >
+                  {deletingVehicleId === vehiclePendingDelete?.id ? (
+                    <ActivityIndicator color="#ffe6ea" size="small" />
+                  ) : (
+                    <Text style={styles.modalDangerButtonText}>
+                      {deleteStep === 1 ? "Continuar" : "Eliminar"}
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -367,5 +523,110 @@ const styles = StyleSheet.create({
   vehicleMeta: {
     color: "#a4c5d3",
     fontWeight: "800",
+  },
+  deleteButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: "#321720",
+    borderWidth: 1,
+    borderColor: "#66303e",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteButtonPressed: {
+    opacity: 0.78,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(3, 10, 14, 0.72)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#102330",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#18384b",
+    padding: 18,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  modalTitleWrap: {
+    flex: 1,
+  },
+  modalEyebrow: {
+    color: "#ffb7c0",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  modalTitle: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "900",
+  },
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "#0d212d",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCloseButtonPressed: {
+    opacity: 0.78,
+  },
+  modalBody: {
+    color: "#c0d7e1",
+    marginTop: 14,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 20,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#294454",
+    backgroundColor: "#0b1821",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSecondaryButtonPressed: {
+    opacity: 0.78,
+  },
+  modalSecondaryButtonText: {
+    color: "#d8ecf5",
+    fontWeight: "900",
+  },
+  modalDangerButton: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: 18,
+    backgroundColor: "#a33549",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalDangerButtonPressed: {
+    opacity: 0.84,
+  },
+  modalDangerButtonText: {
+    color: "#ffe6ea",
+    fontWeight: "900",
   },
 });

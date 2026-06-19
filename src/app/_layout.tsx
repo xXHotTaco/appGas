@@ -2,11 +2,14 @@ import { Stack } from "expo-router";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { VehicleFilterProvider } from "@/contexts/VehicleFilterContext";
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootStack />
+      <VehicleFilterProvider>
+        <RootStack />
+      </VehicleFilterProvider>
     </AuthProvider>
   );
 }
