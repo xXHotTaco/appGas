@@ -30,6 +30,7 @@ import { BarChart, LineChart } from "react-native-chart-kit";
 import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
 import { BrandMark } from "@/components/brand-mark";
 import { useAuth } from "@/contexts/AuthContext";
+import { useVehicleFilter } from "@/contexts/VehicleFilterContext";
 import { getGasRecords, getStats, getVehicles } from "@/lib/api";
 import { formatDisplayDate, shortDate } from "@/lib/fuelStats";
 import type {
@@ -72,27 +73,40 @@ const dashboardIcons = {
 
 export default function DashboardScreen() {
   const { token } = useAuth();
+  const { selectedVehicleId, setSelectedVehicleId } = useVehicleFilter();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [records, setRecords] = useState<GasRecord[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(
-    null,
-  );
 
   const loadData = useCallback(async () => {
     if (!token) return;
 
     try {
       setError("");
-      const [vehiclesData, statsData, recordsData] = await Promise.all([
-        getVehicles(token),
-        getStats(token, selectedVehicleId),
-        getGasRecords(token, selectedVehicleId),
+      const vehiclesData = await getVehicles(token);
+      const availableVehicles = vehiclesData.vehicles || [];
+      const hasSelectedVehicle =
+        !!selectedVehicleId &&
+        availableVehicles.some((vehicle) => vehicle.id === selectedVehicleId);
+      const nextVehicleId =
+        selectedVehicleId === null
+          ? null
+          : hasSelectedVehicle
+            ? selectedVehicleId
+            : availableVehicles[0]?.id || null;
+
+      if (nextVehicleId !== selectedVehicleId) {
+        setSelectedVehicleId(nextVehicleId);
+      }
+
+      const [statsData, recordsData] = await Promise.all([
+        getStats(token, nextVehicleId),
+        getGasRecords(token, nextVehicleId),
       ]);
 
-      setVehicles(vehiclesData.vehicles || []);
+      setVehicles(availableVehicles);
       setStats(normalizeStatsResponse(statsData));
       setRecords(sortRecordsDesc(recordsData.records || []));
     } catch (loadError) {
@@ -794,20 +808,6 @@ const styles = StyleSheet.create({
   },
   vehicleFilterChipTextActive: {
     color: "#06110b",
-  },
-  vehicleFilterSingle: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 16,
-    backgroundColor: "#0b1821",
-    borderWidth: 1,
-    borderColor: "#1d4255",
-    marginBottom: 10,
-  },
-  vehicleFilterSingleText: {
-    color: "#e6f5fb",
-    fontWeight: "900",
   },
   vehicleFilterSummary: {
     color: "#9ec2d1",
