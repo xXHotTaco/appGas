@@ -2,6 +2,7 @@ import { useFocusEffect } from "expo-router";
 import {
   BadgeDollarSign,
   CalendarRange,
+  Car,
   ChartColumn,
   CircleGauge,
   Droplets,
@@ -16,6 +17,7 @@ import type { ElementType } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -28,9 +30,16 @@ import { BarChart, LineChart } from "react-native-chart-kit";
 import { APP_CONTENT_MAX_WIDTH } from "@/constants/layout";
 import { BrandMark } from "@/components/brand-mark";
 import { useAuth } from "@/contexts/AuthContext";
-import { getGasRecords, getStats } from "@/lib/api";
+import { getGasRecords, getStats, getVehicles } from "@/lib/api";
 import { formatDisplayDate, shortDate } from "@/lib/fuelStats";
-import type { GasRecord, StatsResponse } from "@/types/fuel";
+import type {
+  GasRecord,
+  StatsApiResponse,
+  StatsFilter,
+  StatsGroup,
+  StatsResponse,
+  Vehicle,
+} from "@/types/fuel";
 
 const screenWidth = Dimensions.get("window").width;
 const chartWidth = Math.max(
@@ -65,24 +74,26 @@ export default function DashboardScreen() {
   const { token } = useAuth();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [records, setRecords] = useState<GasRecord[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(
+    null,
+  );
 
   const loadData = useCallback(async () => {
     if (!token) return;
 
     try {
       setError("");
-      const [statsData, recordsData] = await Promise.all([
-        getStats(token),
-        getGasRecords(token),
+      const [vehiclesData, statsData, recordsData] = await Promise.all([
+        getVehicles(token),
+        getStats(token, selectedVehicleId),
+        getGasRecords(token, selectedVehicleId),
       ]);
 
-      setStats({
-        summary: statsData.summary,
-        monthly: statsData.monthly || [],
-        efficiency: statsData.efficiency || [],
-      });
+      setVehicles(vehiclesData.vehicles || []);
+      setStats(normalizeStatsResponse(statsData));
       setRecords(sortRecordsDesc(recordsData.records || []));
     } catch (loadError) {
       setError(
@@ -93,7 +104,7 @@ export default function DashboardScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [selectedVehicleId, token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -102,27 +113,60 @@ export default function DashboardScreen() {
     }, [loadData]),
   );
 
-  const summary = stats?.summary;
+  const activeVehicleId = stats?.filter?.vehicle_id ?? selectedVehicleId;
+  const overallSummary = stats?.overall.summary;
+  const activeVehicleName = useMemo(() => {
+    if (!activeVehicleId) {
+      return "Todos los vehiculos";
+    }
+
+    return (
+      vehicles.find((vehicle) => vehicle.id === activeVehicleId)?.name ||
+      records.find((record) => record.vehicle_id === activeVehicleId)?.vehicle_name ||
+      stats?.vehicles[0]?.vehicle_name ||
+      "Vehiculo"
+    );
+  }, [activeVehicleId, records, stats?.vehicles, vehicles]);
+  const vehicleFilterOptions = useMemo<VehicleFilterOption[]>(
+    () => [
+      { id: null, label: "Todos" },
+      ...vehicles.map((vehicle) => ({ id: vehicle.id, label: vehicle.name })),
+    ],
+    [vehicles],
+  );
   const monthlySpentChart = useMemo(
-    () => buildMonthlyChart(stats?.monthly || [], "spent"),
-    [stats?.monthly],
+    () => buildMonthlyChart(stats?.overall.monthly || [], "spent"),
+    [stats?.overall.monthly],
   );
   const monthlyLitersChart = useMemo(
-    () => buildMonthlyChart(stats?.monthly || [], "liters"),
-    [stats?.monthly],
+    () => buildMonthlyChart(stats?.overall.monthly || [], "liters"),
+    [stats?.overall.monthly],
   );
   const efficiencyChart = useMemo(
-    () => buildEfficiencyChart(stats?.efficiency || [], "km_per_liter"),
-    [stats?.efficiency],
+    () => buildEfficiencyChart(stats?.overall.efficiency || [], "km_per_liter"),
+    [stats?.overall.efficiency],
   );
   const costPerKmChart = useMemo(
-    () => buildEfficiencyChart(stats?.efficiency || [], "cost_per_km"),
-    [stats?.efficiency],
+    () => buildEfficiencyChart(stats?.overall.efficiency || [], "cost_per_km"),
+    [stats?.overall.efficiency],
   );
+  const overallEfficiency = stats?.overall.efficiency || [];
   const latestEfficiency =
-    stats?.efficiency && stats.efficiency.length > 0
-      ? stats.efficiency[stats.efficiency.length - 1]
+    overallEfficiency.length > 0
+      ? overallEfficiency[overallEfficiency.length - 1]
       : null;
+  const vehicleChartsEmptyText = activeVehicleId
+    ? "Ese vehiculo aun no tiene datos para esta grafica."
+    : "Agrega registros para ver esta grafica.";
+  const vehicleEfficiencyEmptyText = activeVehicleId
+    ? "Ese vehiculo necesita odometro en al menos 2 cargas."
+    : "Necesitas odometro en al menos 2 cargas.";
+
+  function handleVehicleFilterChange(vehicleId: string | null) {
+    setStats(null);
+    setIsLoading(true);
+    setSelectedVehicleId(vehicleId);
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -153,7 +197,7 @@ export default function DashboardScreen() {
 
         {error ? <ErrorBanner text={error} /> : null}
 
-        {isLoading && !summary ? (
+        {isLoading && !overallSummary ? (
           <View style={styles.loadingCard}>
             <ActivityIndicator color="#7bf1ad" size="large" />
             <Text style={styles.loadingText}>Cargando datos</Text>
@@ -164,22 +208,22 @@ export default function DashboardScreen() {
               <StatCard
                 icon="money"
                 label="Total gastado"
-                value={formatMoney(summary?.total_spent || 0)}
+                value={formatMoney(overallSummary?.total_spent || 0)}
               />
               <StatCard
                 icon="water"
                 label="Litros"
-                value={`${formatNumber(summary?.total_liters || 0, 1)} L`}
+                value={`${formatNumber(overallSummary?.total_liters || 0, 1)} L`}
               />
               <StatCard
                 icon="tag"
                 label="Precio promedio"
-                value={`${formatMoney(summary?.avg_price_per_liter || 0)}/L`}
+                value={`${formatMoney(overallSummary?.avg_price_per_liter || 0)}/L`}
               />
               <StatCard
                 icon="receipt"
                 label="Cargas"
-                value={`${summary?.total_records || 0}`}
+                value={`${overallSummary?.total_records || 0}`}
               />
               <StatCard
                 icon="trend"
@@ -201,6 +245,56 @@ export default function DashboardScreen() {
               />
             </View>
 
+            <View style={styles.sectionHeader}>
+              <Car size={20} color="#7bf1ad" />
+              <Text style={styles.sectionTitle}>Filtro por vehiculo</Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.vehicleFilterRow}
+              style={styles.vehicleFilterScroller}
+            >
+              {vehicleFilterOptions.map((vehicle) => {
+                const isActive = (vehicle.id || null) === (activeVehicleId || null);
+
+                return (
+                  <Pressable
+                    key={vehicle.id || "all"}
+                    onPress={() => handleVehicleFilterChange(vehicle.id)}
+                    style={({ pressed }) => [
+                      styles.vehicleFilterChip,
+                      isActive && styles.vehicleFilterChipActive,
+                      pressed && styles.vehicleFilterChipPressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.vehicleFilterChipText,
+                        isActive && styles.vehicleFilterChipTextActive,
+                      ]}
+                    >
+                      {vehicle.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {overallSummary ? (
+              <Text style={styles.vehicleFilterSummary}>
+                {`${activeVehicleName} | ${overallSummary.total_records} cargas | ${formatNumber(overallSummary.total_liters, 1)} L | ${formatMoney(overallSummary.total_spent)}`}
+              </Text>
+            ) : (
+              <View style={styles.vehicleSelectorEmpty}>
+                <Info size={18} color="#7bf1ad" />
+                <Text style={styles.vehicleSelectorEmptyText}>
+                  Agrega vehiculos o cargas para ver datos filtrados.
+                </Text>
+              </View>
+            )}
+
             <ChartCard title="Gasto mensual" icon="calendar-range">
               {monthlySpentChart.labels.length > 0 ? (
                 <BarChart
@@ -216,7 +310,7 @@ export default function DashboardScreen() {
                   style={styles.chart}
                 />
               ) : (
-                <EmptyGraph text="Agrega registros para ver esta grafica." />
+                <EmptyGraph text={vehicleChartsEmptyText} />
               )}
             </ChartCard>
 
@@ -235,7 +329,7 @@ export default function DashboardScreen() {
                   style={styles.chart}
                 />
               ) : (
-                <EmptyGraph text="Agrega registros para ver litros mensuales." />
+                <EmptyGraph text={vehicleChartsEmptyText} />
               )}
             </ChartCard>
 
@@ -252,7 +346,7 @@ export default function DashboardScreen() {
                   style={styles.chart}
                 />
               ) : (
-                <EmptyGraph text="Necesitas odometro en al menos 2 cargas." />
+                <EmptyGraph text={vehicleEfficiencyEmptyText} />
               )}
             </ChartCard>
 
@@ -271,7 +365,7 @@ export default function DashboardScreen() {
                   style={styles.chart}
                 />
               ) : (
-                <EmptyGraph text="Necesitas odometro en al menos 2 cargas." />
+                <EmptyGraph text={vehicleEfficiencyEmptyText} />
               )}
             </ChartCard>
 
@@ -375,8 +469,98 @@ function ErrorBanner({ text }: { text: string }) {
   );
 }
 
+type VehicleFilterOption = {
+  id: string | null;
+  label: string;
+};
+
+const EMPTY_SUMMARY: StatsGroup["summary"] = {
+  total_records: 0,
+  total_liters: 0,
+  total_spent: 0,
+  avg_price_per_liter: 0,
+};
+
+const EMPTY_FILTER: StatsFilter = {
+  vehicle_id: null,
+};
+
+function normalizeStatsResponse(statsData: StatsApiResponse): StatsResponse {
+  if (isCurrentStatsResponse(statsData)) {
+    return {
+      filter: normalizeStatsFilter(statsData.filter),
+      overall: normalizeStatsGroup(statsData.overall),
+      vehicles: Array.isArray(statsData.vehicles)
+        ? statsData.vehicles.map(normalizeVehicleStats)
+        : [],
+    };
+  }
+
+  const legacySummary = statsData.summary || EMPTY_SUMMARY;
+  const legacyMonthly = Array.isArray(statsData.monthly) ? statsData.monthly : [];
+  const legacyEfficiency = Array.isArray(statsData.efficiency)
+    ? statsData.efficiency
+    : [];
+  const hasLegacyVehicleSeries =
+    legacyMonthly.length > 0 || legacyEfficiency.length > 0;
+
+  return {
+    filter: EMPTY_FILTER,
+    overall: {
+      summary: legacySummary,
+      monthly: legacyMonthly,
+      efficiency: legacyEfficiency,
+    },
+    vehicles: hasLegacyVehicleSeries
+      ? [
+          {
+            vehicle_name: "General",
+            summary: legacySummary,
+            monthly: legacyMonthly,
+            efficiency: legacyEfficiency,
+          },
+        ]
+      : [],
+  };
+}
+
+function isCurrentStatsResponse(
+  statsData: StatsApiResponse,
+): statsData is StatsResponse {
+  return "overall" in statsData && "vehicles" in statsData;
+}
+
+function normalizeStatsFilter(
+  filter?: Partial<StatsFilter> | null,
+): StatsFilter {
+  return {
+    vehicle_id: filter?.vehicle_id || null,
+  };
+}
+
+function normalizeVehicleStats(vehicleStats: StatsResponse["vehicles"][number]) {
+  return {
+    ...vehicleStats,
+    summary: vehicleStats.summary || EMPTY_SUMMARY,
+    monthly: Array.isArray(vehicleStats.monthly) ? vehicleStats.monthly : [],
+    efficiency: Array.isArray(vehicleStats.efficiency)
+      ? vehicleStats.efficiency
+      : [],
+  };
+}
+
+function normalizeStatsGroup(statsGroup?: Partial<StatsGroup> | null): StatsGroup {
+  return {
+    summary: statsGroup?.summary || EMPTY_SUMMARY,
+    monthly: Array.isArray(statsGroup?.monthly) ? statsGroup.monthly : [],
+    efficiency: Array.isArray(statsGroup?.efficiency)
+      ? statsGroup.efficiency
+      : [],
+  };
+}
+
 function buildMonthlyChart(
-  monthly: StatsResponse["monthly"],
+  monthly: StatsGroup["monthly"],
   key: "spent" | "liters",
 ) {
   const entries = monthly.slice(-6);
@@ -392,7 +576,7 @@ function buildMonthlyChart(
 }
 
 function buildEfficiencyChart(
-  efficiency: StatsResponse["efficiency"],
+  efficiency: StatsGroup["efficiency"],
   key: "km_per_liter" | "cost_per_km",
 ) {
   const entries = efficiency.slice(-6);
@@ -580,6 +764,73 @@ const styles = StyleSheet.create({
   chart: {
     marginLeft: -10,
     borderRadius: 18,
+  },
+  vehicleFilterScroller: {
+    marginBottom: 10,
+  },
+  vehicleFilterRow: {
+    paddingBottom: 2,
+    gap: 10,
+  },
+  vehicleFilterChip: {
+    minHeight: 42,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#1d4255",
+    backgroundColor: "#0b1821",
+    justifyContent: "center",
+  },
+  vehicleFilterChipActive: {
+    backgroundColor: "#16d26b",
+    borderColor: "#16d26b",
+  },
+  vehicleFilterChipPressed: {
+    opacity: 0.78,
+  },
+  vehicleFilterChipText: {
+    color: "#b8d1dd",
+    fontWeight: "800",
+  },
+  vehicleFilterChipTextActive: {
+    color: "#06110b",
+  },
+  vehicleFilterSingle: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 16,
+    backgroundColor: "#0b1821",
+    borderWidth: 1,
+    borderColor: "#1d4255",
+    marginBottom: 10,
+  },
+  vehicleFilterSingleText: {
+    color: "#e6f5fb",
+    fontWeight: "900",
+  },
+  vehicleFilterSummary: {
+    color: "#9ec2d1",
+    marginBottom: 16,
+    fontWeight: "700",
+  },
+  vehicleSelectorEmpty: {
+    minHeight: 62,
+    backgroundColor: "#102330",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#18384b",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  vehicleSelectorEmptyText: {
+    color: "#b8d1dd",
+    flex: 1,
+    fontWeight: "700",
   },
   emptyGraph: {
     minHeight: 150,

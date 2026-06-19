@@ -1,7 +1,7 @@
 import type {
   AuthUser,
   GasRecord,
-  StatsResponse,
+  StatsApiResponse,
   Vehicle,
 } from "@/types/fuel";
 
@@ -96,8 +96,20 @@ export function createVehicle(
   );
 }
 
-export function getGasRecords(token: string) {
-  return apiRequest<{ records: GasRecord[] }>("/api/gas-records", {}, token);
+function withVehicleFilter(endpoint: string, vehicleId?: string | null) {
+  if (!vehicleId) {
+    return endpoint;
+  }
+
+  return `${endpoint}?vehicle_id=${encodeURIComponent(vehicleId)}`;
+}
+
+export function getGasRecords(token: string, vehicleId?: string | null) {
+  return apiRequest<{ records: GasRecord[] }>(
+    withVehicleFilter("/api/gas-records", vehicleId),
+    {},
+    token,
+  );
 }
 
 export function createGasRecord(
@@ -130,6 +142,10 @@ export function deleteGasRecord(token: string, id: string) {
   );
 }
 
-export function getStats(token: string) {
-  return apiRequest<StatsResponse>("/api/stats", {}, token);
+export function getStats(token: string, vehicleId?: string | null) {
+  return apiRequest<StatsApiResponse>(
+    withVehicleFilter("/api/stats", vehicleId),
+    {},
+    token,
+  );
 }

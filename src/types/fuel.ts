@@ -41,6 +41,8 @@ export type MonthlyStats = {
 };
 
 export type EfficiencyStats = {
+  vehicle_id?: string | null;
+  vehicle_name?: string | null;
   from_date: string;
   to_date: string;
   km_driven: number;
@@ -49,10 +51,35 @@ export type EfficiencyStats = {
   cost_per_km: number;
 };
 
-export type StatsResponse = {
+export type StatsGroup = {
   summary: StatsSummary;
   monthly: MonthlyStats[];
   efficiency: EfficiencyStats[];
 };
+
+export type StatsFilter = {
+  vehicle_id?: string | null;
+};
+
+export type VehicleStats = {
+  vehicle_id?: string | null;
+  vehicle_name?: string | null;
+  name?: string | null;
+  vehicle?: Pick<Vehicle, "id" | "name"> | null;
+} & StatsGroup;
+
+export type StatsResponse = {
+  filter?: StatsFilter;
+  overall: StatsGroup;
+  vehicles: VehicleStats[];
+};
+
+export type LegacyStatsResponse = {
+  summary?: StatsSummary;
+  monthly?: MonthlyStats[];
+  efficiency?: EfficiencyStats[];
+};
+
+export type StatsApiResponse = StatsResponse | LegacyStatsResponse;
 
 export type FuelRecord = GasRecord;
